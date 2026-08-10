@@ -4,7 +4,7 @@ set -euo pipefail
 ak3_source=${1:?AnyKernel3 source directory is required}
 kernel_image=${2:?kernel image is required}
 ak3_template=${3:?AnyKernel3 template is required}
-output_zip=${4:?output zip is required}
+output_zip=$(realpath -m "${4:?output zip is required}")
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
 
