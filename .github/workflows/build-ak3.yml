@@ -144,7 +144,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             bc bison build-essential cpio flex gcc-aarch64-linux-gnu \
-            ccache git libelf-dev libssl-dev python3 rsync unzip zip
+            libc6-dev-arm64-cross ccache git libelf-dev libssl-dev python3 \
+            rsync unzip zip
 
       - name: Restore compiler cache
         id: ccache
