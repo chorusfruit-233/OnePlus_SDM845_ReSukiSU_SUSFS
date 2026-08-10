@@ -39,6 +39,7 @@ jobs:
     outputs:
       build_key: ${{ steps.meta.outputs.build_key }}
       skip: ${{ steps.decide.outputs.skip }}
+      marker_hit: ${{ steps.marker.outputs.cache-hit }}
       resukisu_sha: ${{ steps.meta.outputs.resukisu_sha }}
       susfs_sha: ${{ steps.meta.outputs.susfs_sha }}
       anykernel_sha: ${{ steps.meta.outputs.anykernel_sha }}
@@ -150,9 +151,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: .ccache
-          key: ccache-v1-${{ runner.os }}-${{ hashFiles('configs/enchilada.json', 'patches/**/*.patch') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: ccache-v1-${{ runner.os }}-${{ needs.resolve-inputs.outputs.build_key }}
           restore-keys: |
-            ccache-v1-${{ runner.os }}-${{ hashFiles('configs/enchilada.json', 'patches/**/*.patch') }}-
             ccache-v1-${{ runner.os }}-
 
       - name: Configure compiler cache
@@ -251,21 +251,21 @@ jobs:
           retention-days: 14
 
       - name: Save compiler cache
-        if: success()
+        if: success() && steps.ccache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: .ccache
-          key: ccache-v1-${{ runner.os }}-${{ hashFiles('configs/enchilada.json', 'patches/**/*.patch') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: ccache-v1-${{ runner.os }}-${{ needs.resolve-inputs.outputs.build_key }}
 
       - name: Save unchanged-input marker
-        if: success()
+        if: success() && needs.resolve-inputs.outputs.marker_hit != 'true'
         shell: bash
         run: |
           mkdir -p .build-marker
           printf '%s\n' '${{ needs.resolve-inputs.outputs.build_key }}' > .build-marker/build-key
 
       - name: Cache unchanged-input marker
-        if: success()
+        if: success() && needs.resolve-inputs.outputs.marker_hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: .build-marker
