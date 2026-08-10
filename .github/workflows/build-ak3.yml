@@ -70,11 +70,11 @@ jobs:
         run: |
           set -euo pipefail
           git -C kernel apply --whitespace=nowarn \
-            patches/lineage-4.9/kernel-4.9-adaptation.patch
+            "$GITHUB_WORKSPACE/patches/lineage-4.9/kernel-4.9-adaptation.patch"
           scripts/prepare-sources.sh kernel \
             '${{ steps.config.outputs.resukisu_repo }}' "$RESUKISU_REF" \
             '${{ steps.config.outputs.susfs_repo }}' "$SUSFS_REF" \
-            patches/lineage-4.9 "$RUNNER_TEMP/susfs4ksu"
+            "$GITHUB_WORKSPACE/patches/lineage-4.9" "$RUNNER_TEMP/susfs4ksu"
 
       - name: Fetch latest AnyKernel3
         run: |
