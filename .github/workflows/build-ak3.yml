@@ -108,7 +108,7 @@ jobs:
           scripts/package-ak3.sh anykernel3 \
             kernel/out/arch/arm64/boot/Image.gz-dtb \
             ak3/anykernel.sh "artifacts/$package"
-          sha256sum "artifacts/$package" > artifacts/SHA256SUMS
+          (cd artifacts && sha256sum "$package" > SHA256SUMS)
           cp kernel/out/arch/arm64/boot/Image.gz-dtb artifacts/
           {
             echo "kernel=$(git -C kernel rev-parse HEAD)"
