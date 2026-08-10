@@ -24,6 +24,10 @@ seccomp、veth/bridge、netfilter、overlayfs 和 tmpfs ACL/XATTR 等选项；�
 AnyKernel3 的实际 commit；全部未变化时直接跳过。手动运行时选择 `force_rebuild`
 可以忽略该标记并强制重编译。
 
+每次实际构建还会上传 `device-tests/` artifact，其中包含静态 AArch64 的
+`susfs_syscall_test`、设备执行脚本和说明。它覆盖 SUS_PATH 的 syscall regression
+以及 SUS_MOUNT 的 mountinfo/fdinfo 检查，可在设备上以对应的 SUSFS 身份运行。
+
 `kernel_base` 必须与补丁生成时的 kernel 基线一致。升级 kernel 基线时，应重新生成
 `kernel-4.9-adaptation.patch` 并同步更新配置中的提交号。
 

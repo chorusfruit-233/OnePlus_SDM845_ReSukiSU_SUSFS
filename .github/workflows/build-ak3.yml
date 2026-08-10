@@ -223,6 +223,17 @@ jobs:
             KCFLAGS=-Wno-error -j"$(nproc)" Image.gz-dtb
           ccache --show-stats
 
+      - name: Build device syscall regression test
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/device-tests
+          aarch64-linux-gnu-gcc -static -O2 -Wall -Wextra \
+            -o artifacts/device-tests/susfs_syscall_test \
+            tests/device/susfs_syscall_test.c
+          cp tests/device/run-susfs-regression.sh tests/device/README.md \
+            artifacts/device-tests/
+          chmod 0755 artifacts/device-tests/run-susfs-regression.sh
+
       - name: Package AnyKernel3
         run: |
           set -euo pipefail
