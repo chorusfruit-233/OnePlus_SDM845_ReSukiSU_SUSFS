@@ -10,6 +10,10 @@
 当前配置面向 OnePlus 6/6T：`enchilada` / `fajita`，defconfig 为
 `enchilada_defconfig`。
 
+第一优先级还包含 Droidspaces/LXC 基础支持。workflow 会检查 namespaces、cgroups、
+seccomp、veth/bridge、netfilter、overlayfs 和 tmpfs ACL/XATTR 等选项；目标 4.9 树
+使用 `CONFIG_NF_CT_NETLINK` 作为新版文档中的 conntrack-netlink 对应项。
+
 ## 使用
 
 把本仓库推送到自己的 GitHub 仓库，打开 **Actions -> Build OnePlus 6/6T Lineage 4.9 AK3**。

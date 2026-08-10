@@ -1,17 +1,21 @@
 diff --git a/arch/arm64/configs/enchilada_defconfig b/arch/arm64/configs/enchilada_defconfig
-index 826ca34dbbba..f67ea7b2c163 100644
+index 826ca34dbbba..c2e3b1d4b5ef 100644
 --- a/arch/arm64/configs/enchilada_defconfig
 +++ b/arch/arm64/configs/enchilada_defconfig
-@@ -16,6 +16,8 @@ CONFIG_IKCONFIG=y
+@@ -16,17 +16,27 @@ CONFIG_IKCONFIG=y
  CONFIG_IKCONFIG_PROC=y
  CONFIG_LOG_CPU_MAX_BUF_SHIFT=17
  CONFIG_CGROUP_FREEZER=y
 +CONFIG_CGROUP_DEVICE=y
++CONFIG_CGROUP_PIDS=y
 +CONFIG_MEMCG=y
  CONFIG_CPUSETS=y
  CONFIG_CGROUP_CPUACCT=y
  CONFIG_CGROUP_SCHEDTUNE=y
-@@ -25,8 +27,14 @@ CONFIG_CGROUP_BPF=y
+ CONFIG_BLK_CGROUP=y
+ CONFIG_RT_GROUP_SCHED=y
+ CONFIG_CGROUP_BPF=y
++CONFIG_CGROUP_NET_PRIO=y
  CONFIG_SCHED_CORE_CTL=y
  CONFIG_SCHED_CORE_ROTATE=y
  CONFIG_NAMESPACES=y
@@ -28,7 +32,31 @@ index 826ca34dbbba..f67ea7b2c163 100644
  CONFIG_SCHED_AUTOGROUP=y
  CONFIG_SCHED_TUNE=y
  CONFIG_DEFAULT_USE_ENERGY_AWARE=y
-@@ -189,6 +197,7 @@ CONFIG_IP_NF_MATCH_AH=y
+@@ -94,6 +104,7 @@ CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
+ CONFIG_CPU_BOOST=y
+ CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
+ CONFIG_NET=y
++# CONFIG_ANDROID_PARANOID_NETWORK is not set
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+ CONFIG_XFRM_USER=y
+@@ -125,6 +136,7 @@ CONFIG_IPV6_VTI=y
+ CONFIG_IPV6_MULTIPLE_TABLES=y
+ CONFIG_IPV6_SUBTREES=y
+ CONFIG_NETFILTER=y
++CONFIG_BRIDGE_NETFILTER=y
+ CONFIG_NF_CONNTRACK=y
+ CONFIG_NF_CONNTRACK_SECMARK=y
+ CONFIG_NF_CONNTRACK_EVENTS=y
+@@ -140,6 +152,7 @@ CONFIG_NF_CONNTRACK_PPTP=y
+ CONFIG_NF_CONNTRACK_SANE=y
+ CONFIG_NF_CONNTRACK_TFTP=y
+ CONFIG_NF_CT_NETLINK=y
++CONFIG_NF_TABLES=y
+ CONFIG_NETFILTER_XT_TARGET_CLASSIFY=y
+ CONFIG_NETFILTER_XT_TARGET_CONNMARK=y
+ CONFIG_NETFILTER_XT_TARGET_CONNSECMARK=y
+@@ -189,6 +202,7 @@ CONFIG_IP_NF_MATCH_AH=y
  CONFIG_IP_NF_MATCH_ECN=y
  CONFIG_IP_NF_MATCH_RPFILTER=y
  CONFIG_IP_NF_MATCH_TTL=y
@@ -36,7 +64,7 @@ index 826ca34dbbba..f67ea7b2c163 100644
  CONFIG_IP_NF_FILTER=y
  CONFIG_IP_NF_TARGET_REJECT=y
  CONFIG_IP_NF_NAT=y
-@@ -209,6 +218,28 @@ CONFIG_IP6_NF_FILTER=y
+@@ -209,6 +223,28 @@ CONFIG_IP6_NF_FILTER=y
  CONFIG_IP6_NF_TARGET_REJECT=y
  CONFIG_IP6_NF_MANGLE=y
  CONFIG_IP6_NF_RAW=y
@@ -65,7 +93,7 @@ index 826ca34dbbba..f67ea7b2c163 100644
  CONFIG_BRIDGE_NF_EBTABLES=y
  CONFIG_BRIDGE_EBT_BROUTE=y
  CONFIG_L2TP=y
-@@ -216,7 +247,11 @@ CONFIG_L2TP_V3=y
+@@ -216,7 +252,11 @@ CONFIG_L2TP_V3=y
  CONFIG_L2TP_IP=y
  CONFIG_L2TP_ETH=y
  CONFIG_BRIDGE=y
@@ -77,7 +105,7 @@ index 826ca34dbbba..f67ea7b2c163 100644
  CONFIG_NET_SCH_HTB=y
  CONFIG_NET_SCH_PRIO=y
  CONFIG_NET_SCH_MULTIQ=y
-@@ -621,6 +656,7 @@ CONFIG_MSDOS_FS=y
+@@ -621,6 +661,7 @@ CONFIG_MSDOS_FS=y
  CONFIG_VFAT_FS=y
  CONFIG_PROC_CMDLINE_APPEND_ANDROID_FORCE_NORMAL_BOOT=y
  CONFIG_TMPFS_POSIX_ACL=y
@@ -85,7 +113,7 @@ index 826ca34dbbba..f67ea7b2c163 100644
  CONFIG_ECRYPT_FS=y
  CONFIG_ECRYPT_FS_MESSAGING=y
  CONFIG_SDCARD_FS=y
-@@ -642,6 +678,21 @@ CONFIG_CC_WERROR=y
+@@ -642,6 +683,21 @@ CONFIG_CC_WERROR=y
  CONFIG_DEBUG_ALIGN_RODATA=y
  CONFIG_PFK=y
  CONFIG_SECURITY_PERF_EVENTS_RESTRICT=y
@@ -1456,6 +1484,25 @@ index 083dc0ac9140..bd547633da10 100644
  	error = statfs_by_dentry(path->dentry, buf);
  	if (!error)
  		buf->f_flags = calculate_f_flags(path->mnt);
+diff --git a/kernel/cgroup.c b/kernel/cgroup.c
+index 930e5aec1bcd..afff238dc79a 100644
+--- a/kernel/cgroup.c
++++ b/kernel/cgroup.c
+@@ -3846,6 +3846,14 @@ static int cgroup_add_file(struct cgroup_subsys_state *css, struct cgroup *cgrp,
+ 		spin_unlock_irq(&cgroup_file_kn_lock);
+ 	}
+ 
++	if (cft->ss && (cgrp->root->flags & CGRP_ROOT_NOPREFIX) &&
++	    !(cft->flags & CFTYPE_NO_PREFIX)) {
++		snprintf(name, CGROUP_FILE_NAME_MAX, "%s.%s",
++			 cgroup_on_dfl(cgrp) ? cft->ss->name :
++			 cft->ss->legacy_name, cft->name);
++		kernfs_create_link(cgrp->kn, name, kn);
++	}
++
+ 	return 0;
+ }
+ 
 diff --git a/kernel/kallsyms.c b/kernel/kallsyms.c
 index a0c3365c884b..2e315d6ad5a2 100644
 --- a/kernel/kallsyms.c
