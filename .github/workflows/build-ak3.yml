@@ -18,6 +18,11 @@ on:
         required: false
         default: master
         type: string
+      force_rebuild:
+        description: Ignore the unchanged-input cache and rebuild
+        required: false
+        default: false
+        type: boolean
   schedule:
     - cron: '17 18 * * *'
 
@@ -29,14 +34,95 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  resolve-inputs:
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    outputs:
+      build_key: ${{ steps.meta.outputs.build_key }}
+      skip: ${{ steps.decide.outputs.skip }}
+      resukisu_sha: ${{ steps.meta.outputs.resukisu_sha }}
+      susfs_sha: ${{ steps.meta.outputs.susfs_sha }}
+      anykernel_sha: ${{ steps.meta.outputs.anykernel_sha }}
     env:
       CONFIG: configs/enchilada.json
       RESUKISU_REF: ${{ inputs.resukisu_ref || 'main' }}
       SUSFS_REF: ${{ inputs.susfs_ref || 'gki-android13-5.10' }}
       ANYKERNEL_REF: ${{ inputs.anykernel_ref || 'master' }}
+    steps:
+      - name: Checkout builder metadata
+        uses: actions/checkout@v4
+
+      - name: Resolve upstream commits
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          resolve_ref() {
+            local repo=$1 ref=$2 sha
+            if [[ "$ref" =~ ^[0-9a-fA-F]{40}$ ]]; then
+              printf '%s\n' "$ref"
+              return
+            fi
+            sha=$(git ls-remote "$repo" \
+              "refs/heads/$ref" "refs/tags/$ref" "refs/tags/$ref^{}" |
+              awk '$2 ~ /\^\{\}$/ { print $1; found=1; exit } \
+                   $2 ~ /refs\/(heads|tags)\// && !found { print $1; exit }')
+            [[ -n "$sha" ]] || {
+              echo "::error::Unable to resolve $repo ref $ref"
+              exit 1
+            }
+            printf '%s\n' "$sha"
+          }
+
+          kernel_base=$(jq -r .kernel_base "$CONFIG")
+          resukisu_sha=$(resolve_ref "$(jq -r .resukisu_repo "$CONFIG")" "$RESUKISU_REF")
+          susfs_sha=$(resolve_ref "$(jq -r .susfs_repo "$CONFIG")" "$SUSFS_REF")
+          anykernel_sha=$(resolve_ref "$(jq -r .anykernel_repo "$CONFIG")" "$ANYKERNEL_REF")
+          builder_sha=$(git rev-parse HEAD)
+          patch_sha=$(sha256sum patches/lineage-4.9/*.patch | sha256sum | cut -d' ' -f1)
+          build_key="${kernel_base}-${resukisu_sha}-${susfs_sha}-${anykernel_sha}-${builder_sha}-${patch_sha}"
+
+          {
+            echo "resukisu_sha=$resukisu_sha"
+            echo "susfs_sha=$susfs_sha"
+            echo "anykernel_sha=$anykernel_sha"
+            echo "build_key=$build_key"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check unchanged-input marker
+        id: marker
+        uses: actions/cache/restore@v4
+        with:
+          path: .build-marker
+          key: built-v1-${{ steps.meta.outputs.build_key }}
+          lookup-only: true
+
+      - name: Decide whether to build
+        id: decide
+        env:
+          CACHE_HIT: ${{ steps.marker.outputs.cache-hit }}
+          FORCE_REBUILD: ${{ inputs.force_rebuild || 'false' }}
+        shell: bash
+        run: |
+          if [[ "$CACHE_HIT" == "true" && "$FORCE_REBUILD" != "true" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Inputs unchanged; skipping kernel build."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Build required (cache_hit=$CACHE_HIT force_rebuild=$FORCE_REBUILD)."
+          fi
+
+  build:
+    needs: resolve-inputs
+    if: needs.resolve-inputs.outputs.skip != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      CONFIG: configs/enchilada.json
+      RESUKISU_REF: ${{ needs.resolve-inputs.outputs.resukisu_sha }}
+      SUSFS_REF: ${{ needs.resolve-inputs.outputs.susfs_sha }}
+      ANYKERNEL_REF: ${{ needs.resolve-inputs.outputs.anykernel_sha }}
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
     steps:
       - name: Checkout builder
         uses: actions/checkout@v4
@@ -57,7 +143,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             bc bison build-essential cpio flex gcc-aarch64-linux-gnu \
-            git libelf-dev libssl-dev python3 rsync unzip zip
+            ccache git libelf-dev libssl-dev python3 rsync unzip zip
+
+      - name: Restore compiler cache
+        id: ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: .ccache
+          key: ccache-v1-${{ runner.os }}-${{ hashFiles('configs/enchilada.json', 'patches/**/*.patch') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ccache-v1-${{ runner.os }}-${{ hashFiles('configs/enchilada.json', 'patches/**/*.patch') }}-
+            ccache-v1-${{ runner.os }}-
+
+      - name: Configure compiler cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$CCACHE_DIR"
+          ccache --max-size=2G
+          ccache --set-config=compiler_check=content
+          ccache --zero-stats
 
       - name: Clone pinned kernel base
         run: |
@@ -114,8 +219,9 @@ jobs:
         working-directory: kernel
         run: |
           make O=out ARCH='${{ steps.config.outputs.arch }}' \
-            CROSS_COMPILE='${{ steps.config.outputs.cross_compile }}' \
+            CROSS_COMPILE="ccache ${{ steps.config.outputs.cross_compile }}" \
             KCFLAGS=-Wno-error -j"$(nproc)" Image.gz-dtb
+          ccache --show-stats
 
       - name: Package AnyKernel3
         run: |
@@ -143,3 +249,24 @@ jobs:
           path: artifacts/
           if-no-files-found: error
           retention-days: 14
+
+      - name: Save compiler cache
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: .ccache
+          key: ccache-v1-${{ runner.os }}-${{ hashFiles('configs/enchilada.json', 'patches/**/*.patch') }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Save unchanged-input marker
+        if: success()
+        shell: bash
+        run: |
+          mkdir -p .build-marker
+          printf '%s\n' '${{ needs.resolve-inputs.outputs.build_key }}' > .build-marker/build-key
+
+      - name: Cache unchanged-input marker
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: .build-marker
+          key: built-v1-${{ needs.resolve-inputs.outputs.build_key }}

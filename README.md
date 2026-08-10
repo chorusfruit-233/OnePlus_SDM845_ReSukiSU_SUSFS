@@ -19,6 +19,11 @@ seccomp、veth/bridge、netfilter、overlayfs 和 tmpfs ACL/XATTR 等选项；�
 把本仓库推送到自己的 GitHub 仓库，打开 **Actions -> Build OnePlus 6/6T Lineage 4.9 AK3**。
 默认使用 `main`、`gki-android13-5.10` 和 `master`，也可以手动填写分支、tag 或 commit。
 
+构建使用最大 2 GiB 的 `ccache`。首次运行会建立缓存，后续只重新编译源码或参数发生
+变化的对象。定时运行还会比较 kernel 基线、builder、补丁、ReSukiSU、SUSFS 和
+AnyKernel3 的实际 commit；全部未变化时直接跳过。手动运行时选择 `force_rebuild`
+可以忽略该标记并强制重编译。
+
 `kernel_base` 必须与补丁生成时的 kernel 基线一致。升级 kernel 基线时，应重新生成
 `kernel-4.9-adaptation.patch` 并同步更新配置中的提交号。
 
