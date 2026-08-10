@@ -1,5 +1,5 @@
 diff --git a/arch/arm64/configs/enchilada_defconfig b/arch/arm64/configs/enchilada_defconfig
-index 826ca34dbbba..54d9af30da9d 100644
+index 826ca34dbbba..dc3bfc35d2c4 100644
 --- a/arch/arm64/configs/enchilada_defconfig
 +++ b/arch/arm64/configs/enchilada_defconfig
 @@ -16,17 +16,27 @@ CONFIG_IKCONFIG=y
@@ -93,7 +93,7 @@ index 826ca34dbbba..54d9af30da9d 100644
  CONFIG_BRIDGE_NF_EBTABLES=y
  CONFIG_BRIDGE_EBT_BROUTE=y
  CONFIG_L2TP=y
-@@ -216,7 +252,11 @@ CONFIG_L2TP_V3=y
+@@ -216,7 +252,12 @@ CONFIG_L2TP_V3=y
  CONFIG_L2TP_IP=y
  CONFIG_L2TP_ETH=y
  CONFIG_BRIDGE=y
@@ -102,10 +102,11 @@ index 826ca34dbbba..54d9af30da9d 100644
 +CONFIG_NET_SCH_FQ=y
 +CONFIG_NET_SCH_FQ_CODEL=y
 +CONFIG_NET_SCH_PIE=y
++CONFIG_NET_SCH_CAKE=y
  CONFIG_NET_SCH_HTB=y
  CONFIG_NET_SCH_PRIO=y
  CONFIG_NET_SCH_MULTIQ=y
-@@ -621,6 +661,7 @@ CONFIG_MSDOS_FS=y
+@@ -621,6 +662,7 @@ CONFIG_MSDOS_FS=y
  CONFIG_VFAT_FS=y
  CONFIG_PROC_CMDLINE_APPEND_ANDROID_FORCE_NORMAL_BOOT=y
  CONFIG_TMPFS_POSIX_ACL=y
@@ -113,12 +114,13 @@ index 826ca34dbbba..54d9af30da9d 100644
  CONFIG_ECRYPT_FS=y
  CONFIG_ECRYPT_FS_MESSAGING=y
  CONFIG_SDCARD_FS=y
-@@ -642,6 +683,21 @@ CONFIG_CC_WERROR=y
+@@ -642,7 +684,26 @@ CONFIG_CC_WERROR=y
  CONFIG_DEBUG_ALIGN_RODATA=y
  CONFIG_PFK=y
  CONFIG_SECURITY_PERF_EVENTS_RESTRICT=y
 +CONFIG_TCP_CONG_ADVANCED=y
 +CONFIG_TCP_CONG_BBR=y
++CONFIG_TCP_CONG_BBR3=y
 +CONFIG_KSU=y
 +# CONFIG_KSU_TRACEPOINT_HOOK is not set
 +# CONFIG_KSU_MANUAL_HOOK is not set
@@ -133,8 +135,44 @@ index 826ca34dbbba..54d9af30da9d 100644
 +# CONFIG_KSU_SUSFS_OPEN_REDIRECT is not set
 +CONFIG_KSU_SUSFS_SUS_MAP=y
  CONFIG_SECURITY=y
++CONFIG_BBG=y
++# CONFIG_BBG_BLOCK_BOOT is not set
++# CONFIG_BBG_BLOCK_RECOVERY is not set
  CONFIG_HARDENED_USERCOPY=y
  CONFIG_FORTIFY_SOURCE=y
+ CONFIG_SECURITY_SELINUX=y
+diff --git a/arch/arm64/lib/clear_page.S b/arch/arm64/lib/clear_page.S
+index ef08e905e35b..e674117cd00a 100644
+--- a/arch/arm64/lib/clear_page.S
++++ b/arch/arm64/lib/clear_page.S
+@@ -25,6 +25,7 @@
+  * Parameters:
+  *	x0 - dest
+  */
++	.p2align 4
+ ENTRY(clear_page)
+ 	mrs	x1, dczid_el0
+ 	and	w1, w1, #0xf
+diff --git a/arch/arm64/lib/copy_template.S b/arch/arm64/lib/copy_template.S
+index 410fbdb8163f..de415f42d71d 100644
+--- a/arch/arm64/lib/copy_template.S
++++ b/arch/arm64/lib/copy_template.S
+@@ -51,6 +51,7 @@ C_h	.req	x12
+ D_l	.req	x13
+ D_h	.req	x14
+ 
++	prfm	pldl1strm, [src, #(1 * L1_CACHE_BYTES)]
+ 	mov	dst, dstin
+ 	cmp	count, #16
+ 	/*When memory length is less than 16, the accessed are not aligned.*/
+@@ -181,6 +182,7 @@ D_h	.req	x14
+ 	ldp1	C_l, C_h, src, #16
+ 	stp1	D_l, D_h, dst, #16
+ 	ldp1	D_l, D_h, src, #16
++	prfm	pldl1strm, [src, #(4 * L1_CACHE_BYTES)]
+ 	subs	count, count, #64
+ 	b.ge	1b
+ 	stp1	A_l, A_h, dst, #16
 diff --git a/drivers/Kconfig b/drivers/Kconfig
 index 58c705d2bc5b..ad10ae4b0e8f 100644
 --- a/drivers/Kconfig
@@ -155,6 +193,98 @@ index da32ccd6a8d6..42e3442b2e2f 100644
  obj-y				+= oneplus/
 +
 +obj-$(CONFIG_KSU) += kernelsu/
+diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+index 1667bc0e7b50..3daf83add12a 100644
+--- a/drivers/cpufreq/cpufreq.c
++++ b/drivers/cpufreq/cpufreq.c
+@@ -36,6 +36,7 @@
+ #include <trace/events/power.h>
+ 
+ static LIST_HEAD(cpufreq_policy_list);
++static DEFINE_PER_CPU(unsigned int, cpufreq_min_freq_limit);
+ 
+ static inline bool policy_is_inactive(struct cpufreq_policy *policy)
+ {
+@@ -748,6 +749,13 @@ show_one(cpuinfo_transition_latency, cpuinfo.transition_latency);
+ show_one(scaling_min_freq, min);
+ show_one(scaling_max_freq, max);
+ 
++static ssize_t show_scaling_min_freq_limit(struct cpufreq_policy *policy,
++					   char *buf)
++{
++	return sprintf(buf, "%u\n", per_cpu(cpufreq_min_freq_limit,
++					      policy->cpu));
++}
++
+ static ssize_t show_scaling_cur_freq(struct cpufreq_policy *policy, char *buf)
+ {
+ 	ssize_t ret;
+@@ -791,7 +799,48 @@ static ssize_t store_##file_name					\
+ 	return ret ? ret : count;					\
+ }
+ 
+-store_one(scaling_min_freq, min);
++static ssize_t store_scaling_min_freq(struct cpufreq_policy *policy,
++				      const char *buf, size_t count)
++{
++	struct cpufreq_policy new_policy;
++	unsigned int limit, requested;
++	int ret;
++
++	ret = sscanf(buf, "%u", &requested);
++	if (ret != 1)
++		return -EINVAL;
++
++	limit = per_cpu(cpufreq_min_freq_limit, policy->cpu);
++	if (limit)
++		requested = min(requested, limit);
++
++	memcpy(&new_policy, policy, sizeof(*policy));
++	new_policy.min = requested;
++	new_policy.max = policy->user_policy.max;
++	ret = cpufreq_set_policy(policy, &new_policy);
++	if (!ret)
++		policy->user_policy.min = requested;
++
++	return ret ? ret : count;
++}
++
++static ssize_t store_scaling_min_freq_limit(struct cpufreq_policy *policy,
++					    const char *buf, size_t count)
++{
++	unsigned int cpu, limit;
++
++	if (sscanf(buf, "%u", &limit) != 1)
++		return -EINVAL;
++	if (limit && (limit < policy->cpuinfo.min_freq ||
++		      limit > policy->cpuinfo.max_freq))
++		return -EINVAL;
++
++	for_each_cpu(cpu, policy->related_cpus)
++		per_cpu(cpufreq_min_freq_limit, cpu) = limit;
++
++	return count;
++}
++
+ store_one(scaling_max_freq, max);
+ 
+ /**
+@@ -966,6 +1015,7 @@ cpufreq_freq_attr_ro(bios_limit);
+ cpufreq_freq_attr_ro(related_cpus);
+ cpufreq_freq_attr_ro(affected_cpus);
+ cpufreq_freq_attr_rw(scaling_min_freq);
++cpufreq_freq_attr_rw(scaling_min_freq_limit);
+ cpufreq_freq_attr_rw(scaling_max_freq);
+ cpufreq_freq_attr_rw(scaling_governor);
+ cpufreq_freq_attr_rw(scaling_setspeed);
+@@ -975,6 +1025,7 @@ static struct attribute *default_attrs[] = {
+ 	&cpuinfo_max_freq.attr,
+ 	&cpuinfo_transition_latency.attr,
+ 	&scaling_min_freq.attr,
++	&scaling_min_freq_limit.attr,
+ 	&scaling_max_freq.attr,
+ 	&affected_cpus.attr,
+ 	&related_cpus.attr,
 diff --git a/drivers/input/input.c b/drivers/input/input.c
 index 378717d1b3b4..f2d35ef5d2a2 100644
 --- a/drivers/input/input.c
@@ -195,6 +325,19 @@ index 3cfd698bbdc8..5b4103c39ced 100644
  ifeq ($(CONFIG_BLOCK),y)
  obj-y +=	buffer.o block_dev.o direct-io.o mpage.o
  else
+diff --git a/fs/dcache.c b/fs/dcache.c
+index e1abf9c02aba..7ad76361e261 100644
+--- a/fs/dcache.c
++++ b/fs/dcache.c
+@@ -82,7 +82,7 @@
+  *   dentry1->d_lock
+  *     dentry2->d_lock
+  */
+-int sysctl_vfs_cache_pressure __read_mostly = 100;
++int sysctl_vfs_cache_pressure __read_mostly = 50;
+ EXPORT_SYMBOL_GPL(sysctl_vfs_cache_pressure);
+ 
+ __cacheline_aligned_in_smp DEFINE_SEQLOCK(rename_lock);
 diff --git a/fs/exec.c b/fs/exec.c
 index 5addf3b00561..fd8509033c31 100644
 --- a/fs/exec.c
@@ -247,6 +390,19 @@ index 5addf3b00561..fd8509033c31 100644
  	/*
  	 * We move the actual failure in case of RLIMIT_NPROC excess from
  	 * set*uid() to execve() because too many poorly written programs
+diff --git a/fs/f2fs/gc.h b/fs/f2fs/gc.h
+index bbac9d3787bd..f489f52f6dd3 100644
+--- a/fs/f2fs/gc.h
++++ b/fs/f2fs/gc.h
+@@ -10,7 +10,7 @@
+ 						 * whether IO subsystem is idle
+ 						 * or not
+ 						 */
+-#define DEF_GC_THREAD_URGENT_SLEEP_TIME	500	/* 500 ms */
++#define DEF_GC_THREAD_URGENT_SLEEP_TIME	50	/* 50 ms */
+ #define DEF_GC_THREAD_MIN_SLEEP_TIME	30000	/* milliseconds */
+ #define DEF_GC_THREAD_MAX_SLEEP_TIME	60000
+ #define DEF_GC_THREAD_NOGC_SLEEP_TIME	300000	/* wait 5 min */
 diff --git a/fs/namei.c b/fs/namei.c
 index e8537d462a6f..11ae683d159c 100644
 --- a/fs/namei.c
@@ -1824,6 +1980,230 @@ index 083dc0ac9140..bd547633da10 100644
  	error = statfs_by_dentry(path->dentry, buf);
  	if (!error)
  		buf->f_flags = calculate_f_flags(path->mnt);
+diff --git a/include/linux/fs.h b/include/linux/fs.h
+index b0034c1818b1..ff7bf4a9883e 100644
+--- a/include/linux/fs.h
++++ b/include/linux/fs.h
+@@ -945,7 +945,7 @@ struct file {
+ 	struct list_head	f_tfile_llink;
+ #endif /* #ifdef CONFIG_EPOLL */
+ 	struct address_space	*f_mapping;
+-} __attribute__((aligned(4)));	/* lest something weird decides that 2 is OK */
++} __attribute__((aligned(8)));
+ 
+ struct file_handle {
+ 	__u32 handle_bytes;
+diff --git a/include/linux/tcp.h b/include/linux/tcp.h
+index ff496573f8af..8aca2bdd360b 100644
+--- a/include/linux/tcp.h
++++ b/include/linux/tcp.h
+@@ -278,6 +278,7 @@ struct tcp_sock {
+ 	u32	prr_out;	/* Total number of pkts sent during Recovery. */
+ 	u32	delivered;	/* Total data packets delivered incl. rexmits */
+ 	u32	lost;		/* Total data packets lost incl. rexmits */
++	u32	delivered_ce;	/* Total packets delivered with CE marking */
+ 	u32	app_limited;	/* limited until "delivered" reaches this val */
+ 	struct skb_mstamp first_tx_mstamp;  /* start of window send phase */
+ 	struct skb_mstamp delivered_mstamp; /* time we reached "delivered" */
+diff --git a/include/net/tcp.h b/include/net/tcp.h
+index 275ba7aab1d4..897385602641 100644
+--- a/include/net/tcp.h
++++ b/include/net/tcp.h
+@@ -400,6 +400,8 @@ static inline void tcp_dec_quickack_mode(struct sock *sk,
+ #define	TCP_ECN_QUEUE_CWR	2
+ #define	TCP_ECN_DEMAND_CWR	4
+ #define	TCP_ECN_SEEN		8
++#define	TCP_ECN_LOW				16
++#define	TCP_ECN_ECT_PERMANENT	32
+ 
+ enum tcp_tw_status {
+ 	TCP_TW_SUCCESS = 0,
+@@ -876,6 +878,9 @@ enum tcp_ca_event {
+ 	CA_EVENT_LOSS,		/* loss timeout */
+ 	CA_EVENT_ECN_NO_CE,	/* ECT set, but not CE marked */
+ 	CA_EVENT_ECN_IS_CE,	/* received CE marked IP packet */
++#ifndef __GENKSYMS__
++	CA_EVENT_TLP_RECOVERY,	/* a lost segment was repaired by TLP probe */
++#endif
+ };
+ 
+ /* Information about inbound ACK, passed to cong_ops->in_ack_event() */
+@@ -898,6 +903,9 @@ enum tcp_ca_ack_event_flags {
+ #define TCP_CONG_NON_RESTRICTED 0x1
+ /* Requires ECN/ECT set on all packets */
+ #define TCP_CONG_NEEDS_ECN	0x2
++#define TCP_CONG_WANTS_CE_EVENTS 0x4
++#define TCP_CONG_MASK	(TCP_CONG_NON_RESTRICTED | TCP_CONG_NEEDS_ECN | \
++			 TCP_CONG_WANTS_CE_EVENTS)
+ 
+ union tcp_cc_info;
+ 
+@@ -926,6 +934,12 @@ struct rate_sample {
+ 	u32  prior_in_flight;	/* in flight before this ACK */
+ 	bool is_app_limited;	/* is sample from packet with bubble in pipe? */
+ 	bool is_retrans;	/* is sample from retransmission? */
++	bool is_ack_delayed;	/* is this (likely) a delayed ACK? */
++	bool is_acking_tlp_retrans_seq;
++	bool is_ece;
++	u32 tx_in_flight;	/* packets in flight at sample start */
++	s32 lost;		/* packets lost over the sample */
++	s32 delivered_ce;	/* packets delivered with CE marking */
+ };
+ 
+ struct tcp_congestion_ops {
+@@ -998,6 +1012,14 @@ static inline char *tcp_ca_get_name_by_key(u32 key, char *buffer)
+ }
+ #endif
+ 
++static inline bool tcp_ca_wants_ce_events(const struct sock *sk)
++{
++	const struct inet_connection_sock *icsk = inet_csk(sk);
++
++	return icsk->icsk_ca_ops->flags & (TCP_CONG_NEEDS_ECN |
++					   TCP_CONG_WANTS_CE_EVENTS);
++}
++
+ static inline bool tcp_ca_needs_ecn(const struct sock *sk)
+ {
+ 	const struct inet_connection_sock *icsk = inet_csk(sk);
+@@ -1030,6 +1052,13 @@ void tcp_rate_gen(struct sock *sk, u32 delivered, u32 lost,
+ 		  bool is_sack_reneg, struct skb_mstamp *now, struct rate_sample *rs);
+ void tcp_rate_check_app_limited(struct sock *sk);
+ 
++static inline bool tcp_skb_tx_in_flight_is_suspicious(u32 skb_pcount,
++						      u32 skb_sacked_flags,
++						      u32 tx_in_flight)
++{
++	return (skb_pcount > tx_in_flight) && !(skb_sacked_flags & TCPCB_LOST);
++}
++
+ /* These functions determine how the current flow behaves in respect of SACK
+  * handling. SACK is negotiated with the peer, and therefore it can vary
+  * between different flows.
+@@ -1101,6 +1130,17 @@ static inline unsigned int tcp_packets_in_flight(const struct tcp_sock *tp)
+ 
+ #define TCP_INFINITE_SSTHRESH	0x7fffffff
+ 
++static inline u32 tcp_snd_cwnd(const struct tcp_sock *tp)
++{
++	return tp->snd_cwnd;
++}
++
++static inline void tcp_snd_cwnd_set(struct tcp_sock *tp, u32 val)
++{
++	WARN_ON_ONCE((int)val <= 0);
++	tp->snd_cwnd = val;
++}
++
+ static inline bool tcp_in_slow_start(const struct tcp_sock *tp)
+ {
+ 	return tp->snd_cwnd < tp->snd_ssthresh;
+diff --git a/include/uapi/linux/inet_diag.h b/include/uapi/linux/inet_diag.h
+index 509cd961068d..2d15e4cb6ee4 100644
+--- a/include/uapi/linux/inet_diag.h
++++ b/include/uapi/linux/inet_diag.h
+@@ -167,6 +167,31 @@ struct tcp_bbr_info {
+ 	__u32	bbr_min_rtt;		/* min-filtered RTT in uSec */
+ 	__u32	bbr_pacing_gain;	/* pacing gain shifted left 8 bits */
+ 	__u32	bbr_cwnd_gain;		/* cwnd gain shifted left 8 bits */
++#ifndef __GENKSYMS__
++	__u32	bbr_bw_hi_lsb;		/* lower 32 bits of bw_hi */
++	__u32	bbr_bw_hi_msb;		/* upper 32 bits of bw_hi */
++	__u32	bbr_bw_lo_lsb;		/* lower 32 bits of bw_lo */
++	__u32	bbr_bw_lo_msb;		/* upper 32 bits of bw_lo */
++	__u8	bbr_mode;		/* current bbr_mode in state machine */
++	__u8	bbr_phase;		/* current state machine phase */
++	__u8	unused1;		/* alignment padding; not used yet */
++	__u8	bbr_version;		/* BBR algorithm version */
++	__u32	bbr_inflight_lo;	/* lower short-term data volume bound */
++	__u32	bbr_inflight_hi;	/* higher long-term data volume bound */
++	__u32	bbr_extra_acked;	/* max excess packets ACKed in epoch */
++#endif
++};
++
++/* TCP BBR congestion control bbr_phase as reported in netlink/ss stats. */
++enum tcp_bbr_phase {
++	BBR_PHASE_INVALID		= 0,
++	BBR_PHASE_STARTUP		= 1,
++	BBR_PHASE_DRAIN			= 2,
++	BBR_PHASE_PROBE_RTT		= 3,
++	BBR_PHASE_PROBE_BW_UP		= 4,
++	BBR_PHASE_PROBE_BW_DOWN		= 5,
++	BBR_PHASE_PROBE_BW_CRUISE	= 6,
++	BBR_PHASE_PROBE_BW_REFILL	= 7,
+ };
+ 
+ union tcp_cc_info {
+diff --git a/include/uapi/linux/pkt_sched.h b/include/uapi/linux/pkt_sched.h
+index 4937c09b8963..3efb311e943e 100644
+--- a/include/uapi/linux/pkt_sched.h
++++ b/include/uapi/linux/pkt_sched.h
+@@ -866,4 +866,65 @@ struct tc_pie_xstats {
+ 	__u32 maxq;             /* maximum queue size */
+ 	__u32 ecn_mark;         /* packets marked with ecn*/
+ };
++
++/* CAKE */
++enum {
++	TCA_CAKE_UNSPEC,
++	TCA_CAKE_BASE_RATE,
++	TCA_CAKE_DIFFSERV_MODE,
++	TCA_CAKE_ATM,
++	TCA_CAKE_FLOW_MODE,
++	TCA_CAKE_OVERHEAD,
++	TCA_CAKE_RTT,
++	TCA_CAKE_TARGET,
++	TCA_CAKE_AUTORATE,
++	TCA_CAKE_MEMORY,
++	TCA_CAKE_NAT,
++	TCA_CAKE_ETHERNET,
++	TCA_CAKE_WASH,
++	TCA_CAKE_MPU,
++	TCA_CAKE_INGRESS,
++	TCA_CAKE_ACK_FILTER,
++	__TCA_CAKE_MAX
++};
++#define TCA_CAKE_MAX	(__TCA_CAKE_MAX - 1)
++
++struct tc_cake_traffic_stats {
++	__u32 packets;
++	__u32 link_ms;
++	__u64 bytes;
++};
++
++struct tc_cake_tin_stats {
++	__u32 threshold_rate;
++	__u32 target_us;
++	struct tc_cake_traffic_stats sent;
++	struct tc_cake_traffic_stats dropped;
++	struct tc_cake_traffic_stats ecn_marked;
++	struct tc_cake_traffic_stats backlog;
++	__u32 interval_us;
++	__u32 way_indirect_hits;
++	__u32 way_misses;
++	__u32 way_collisions;
++	__u32 peak_delay_us;
++	__u32 avge_delay_us;
++	__u32 base_delay_us;
++	__u16 sparse_flows;
++	__u16 bulk_flows;
++	__u16 unresponse_flows;
++	__u16 spare;
++	__u32 max_skblen;
++	struct tc_cake_traffic_stats ack_drops;
++};
++#define TC_CAKE_MAX_TINS (8)
++
++struct tc_cake_xstats {
++	__u16 version;
++	__u16 tin_stats_size;
++	__u32 capacity_estimate;
++	__u32 memory_limit;
++	__u32 memory_used;
++	__u8 tin_cnt;
++	struct tc_cake_tin_stats tin_stats[0];
++};
+ #endif
 diff --git a/kernel/cgroup.c b/kernel/cgroup.c
 index 930e5aec1bcd..afff238dc79a 100644
 --- a/kernel/cgroup.c
@@ -1958,6 +2338,19 @@ index d5cafeb15c14..1459a6749413 100644
  	up_read(&uts_sem);
  	if (copy_to_user(name, &tmp, sizeof(tmp)))
  		return -EFAULT;
+diff --git a/kernel/time/alarmtimer.c b/kernel/time/alarmtimer.c
+index 528bbd136229..a6760f95a5db 100644
+--- a/kernel/time/alarmtimer.c
++++ b/kernel/time/alarmtimer.c
+@@ -281,7 +281,7 @@ static int alarmtimer_suspend(struct device *dev)
+ 		return 0;
+ 
+ 	if (ktime_to_ns(min) < 2 * NSEC_PER_SEC) {
+-		__pm_wakeup_event(ws, 2 * MSEC_PER_SEC);
++		__pm_wakeup_event(ws, ktime_to_ms(min) + 1);
+ 		return -EBUSY;
+ 	}
+ 
 diff --git a/mm/memory.c b/mm/memory.c
 index be6a0ae3e89b..8b8110c51d53 100755
 --- a/mm/memory.c
@@ -1994,6 +2387,145 @@ index be6a0ae3e89b..8b8110c51d53 100755
  		ret = get_user_pages_remote(tsk, mm, addr, 1,
  				gup_flags, &page, &vma);
  		if (ret <= 0) {
+diff --git a/net/ipv4/Kconfig b/net/ipv4/Kconfig
+index 29be5bcbe7ac..b88d052f81dc 100644
+--- a/net/ipv4/Kconfig
++++ b/net/ipv4/Kconfig
+@@ -666,6 +666,15 @@ config TCP_CONG_BBR
+ 	bufferbloat, policers, or AQM schemes that do not provide a delay
+ 	signal. It requires the fq ("Fair Queue") pacing packet scheduler.
+ 
++config TCP_CONG_BBR3
++	tristate "BBRv3 TCP"
++	default n
++	---help---
++	  BBRv3 is the third generation of Google's model-based congestion
++	  control. It adds explicit loss and ECN response, bounded inflight
++	  probing, and improved coexistence with loss-based algorithms.
++	  Keep BBRv1 enabled as a runtime fallback on this backport.
++
+ choice
+ 	prompt "Default TCP congestion control"
+ 	default DEFAULT_CUBIC
+@@ -703,6 +712,9 @@ choice
+ 	config DEFAULT_BBR
+ 		bool "BBR" if TCP_CONG_BBR=y
+ 
++	config DEFAULT_BBR3
++		bool "BBRv3" if TCP_CONG_BBR3=y
++
+ 	config DEFAULT_RENO
+ 		bool "Reno"
+ endchoice
+@@ -727,6 +739,7 @@ config DEFAULT_TCP_CONG
+ 	default "dctcp" if DEFAULT_DCTCP
+ 	default "cdg" if DEFAULT_CDG
+ 	default "bbr" if DEFAULT_BBR
++	default "bbr3" if DEFAULT_BBR3
+ 	default "cubic"
+ 
+ config TCP_MD5SIG
+diff --git a/net/ipv4/Makefile b/net/ipv4/Makefile
+index bc6a6c8b9bcd..6fe97a7c0d7b 100644
+--- a/net/ipv4/Makefile
++++ b/net/ipv4/Makefile
+@@ -42,6 +42,7 @@ obj-$(CONFIG_INET_TCP_DIAG) += tcp_diag.o
+ obj-$(CONFIG_INET_UDP_DIAG) += udp_diag.o
+ obj-$(CONFIG_NET_TCPPROBE) += tcp_probe.o
+ obj-$(CONFIG_TCP_CONG_BBR) += tcp_bbr.o
++obj-$(CONFIG_TCP_CONG_BBR3) += tcp_bbr3.o
+ obj-$(CONFIG_TCP_CONG_BIC) += tcp_bic.o
+ obj-$(CONFIG_TCP_CONG_CDG) += tcp_cdg.o
+ obj-$(CONFIG_TCP_CONG_CUBIC) += tcp_cubic.o
+diff --git a/net/ipv4/tcp_rate.c b/net/ipv4/tcp_rate.c
+index 18309f58ab8d..112c348bdc39 100644
+--- a/net/ipv4/tcp_rate.c
++++ b/net/ipv4/tcp_rate.c
+@@ -124,6 +124,8 @@ void tcp_rate_gen(struct sock *sk, u32 delivered, u32 lost,
+ 
+ 	rs->acked_sacked = delivered;	/* freshly ACKed or SACKed */
+ 	rs->losses = lost;		/* freshly marked lost */
++	rs->lost = lost;
++	rs->tx_in_flight = rs->prior_in_flight;
+ 	/* Return an invalid sample if no timing information is available or
+ 	 * in recovery from loss with SACK reneging. Rate samples taken during
+ 	 * a SACK reneging event may overestimate bw by including packets that
+diff --git a/net/sched/Kconfig b/net/sched/Kconfig
+index 87956a768d1b..7d8b12caeaac 100644
+--- a/net/sched/Kconfig
++++ b/net/sched/Kconfig
+@@ -309,6 +309,15 @@ config NET_SCH_PIE
+ 
+ 	  If unsure, say N.
+ 
++config NET_SCH_CAKE
++	tristate "Common Applications Kept Enhanced (CAKE)"
++	help
++	  Say Y here if you want to use the CAKE queue discipline, which
++	  combines a rate shaper, flow isolation and active queue management.
++
++	  To compile this driver as a module, choose M here: the module will
++	  be called sch_cake.
++
+ config NET_SCH_INGRESS
+ 	tristate "Ingress/classifier-action Qdisc"
+ 	depends on NET_CLS_ACT
+diff --git a/net/sched/Makefile b/net/sched/Makefile
+index 4bdda3634e0b..33f55f881f0f 100644
+--- a/net/sched/Makefile
++++ b/net/sched/Makefile
+@@ -51,6 +51,7 @@ obj-$(CONFIG_NET_SCH_FQ_CODEL)	+= sch_fq_codel.o
+ obj-$(CONFIG_NET_SCH_FQ)	+= sch_fq.o
+ obj-$(CONFIG_NET_SCH_HHF)	+= sch_hhf.o
+ obj-$(CONFIG_NET_SCH_PIE)	+= sch_pie.o
++obj-$(CONFIG_NET_SCH_CAKE)	+= sch_cake.o
+ 
+ obj-$(CONFIG_NET_CLS_U32)	+= cls_u32.o
+ obj-$(CONFIG_NET_CLS_ROUTE4)	+= cls_route.o
+diff --git a/security/Kconfig b/security/Kconfig
+index 638afc868ba2..559f5c174064 100644
+--- a/security/Kconfig
++++ b/security/Kconfig
+@@ -200,6 +200,7 @@ source security/tomoyo/Kconfig
+ source security/apparmor/Kconfig
+ source security/loadpin/Kconfig
+ source security/yama/Kconfig
++source security/baseband-guard/Kconfig
+ 
+ source security/integrity/Kconfig
+ 
+@@ -241,4 +242,3 @@ config DEFAULT_SECURITY
+ 	default "" if DEFAULT_SECURITY_DAC
+ 
+ endmenu
+-
+diff --git a/security/Makefile b/security/Makefile
+index 79166bad11d0..6629fdb69d54 100644
+--- a/security/Makefile
++++ b/security/Makefile
+@@ -27,6 +27,7 @@ obj-$(CONFIG_SECURITY_YAMA)		+= yama/
+ obj-$(CONFIG_SECURITY_LOADPIN)		+= loadpin/
+ obj-$(CONFIG_ARCH_QCOM)				+= pfe/
+ obj-$(CONFIG_CGROUP_DEVICE)		+= device_cgroup.o
++obj-$(CONFIG_BBG)			+= baseband-guard/
+ 
+ # Object integrity file lists
+ subdir-$(CONFIG_INTEGRITY)		+= integrity
+diff --git a/security/selinux/Makefile b/security/selinux/Makefile
+index 3411c33e2a44..561f54ca07ac 100644
+--- a/security/selinux/Makefile
++++ b/security/selinux/Makefile
+@@ -15,6 +15,10 @@ selinux-$(CONFIG_NETLABEL) += netlabel.o
+ 
+ ccflags-y := -I$(srctree)/security/selinux -I$(srctree)/security/selinux/include
+ 
++ifeq ($(CONFIG_BBG),y)
++ccflags-y += -I$(srctree)/security/baseband-guard/tracing
++endif
++
+ $(addprefix $(obj)/,$(selinux-y)): $(obj)/flask.h
+ 
+ quiet_cmd_flask = GEN     $(obj)/flask.h $(obj)/av_permissions.h
 diff --git a/security/selinux/avc.c b/security/selinux/avc.c
 index f11a4abe18fc..6733436a40f0 100644
 --- a/security/selinux/avc.c
@@ -2036,3 +2568,27 @@ index f11a4abe18fc..6733436a40f0 100644
  	BUG_ON(!tclass || tclass >= ARRAY_SIZE(secclass_map));
  	audit_log_format(ab, " tclass=%s", secclass_map[tclass-1].name);
  }
+diff --git a/security/selinux/include/objsec.h b/security/selinux/include/objsec.h
+index b1f3f6686c85..16a94d736fed 100644
+--- a/security/selinux/include/objsec.h
++++ b/security/selinux/include/objsec.h
+@@ -27,6 +27,9 @@
+ #include <net/net_namespace.h>
+ //#include "flask.h"
+ //#include "avc.h"
++#ifdef CONFIG_BBG
++#include "bbg_tracing.h"
++#endif
+ #include "security.h"
+ 
+ struct task_security_struct {
+@@ -36,6 +39,9 @@ struct task_security_struct {
+ 	u32 create_sid;		/* fscreate SID */
+ 	u32 keycreate_sid;	/* keycreate SID */
+ 	u32 sockcreate_sid;	/* fscreate SID */
++#ifdef CONFIG_BBG
++	struct bbg_cred_security_struct bbg_cred;
++#endif
+ };
+ 
+ enum label_initialized {

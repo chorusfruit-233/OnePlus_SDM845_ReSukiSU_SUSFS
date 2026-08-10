@@ -1,0 +1,50 @@
+diff --git a/net/sched/sch_cake.c b/net/sched/sch_cake.c
+index 62b67e7..2fae4a4 100644
+--- a/net/sched/sch_cake.c
++++ b/net/sched/sch_cake.c
+@@ -64,6 +64,16 @@
+ #include <net/netfilter/nf_conntrack.h>
+ #endif
+ 
++static void *cake_kvzalloc(size_t size, gfp_t flags)
++{
++	void *ptr = kzalloc(size, flags | __GFP_NOWARN);
++
++	if (!ptr && (flags & GFP_KERNEL) == GFP_KERNEL)
++		ptr = vzalloc(size);
++
++	return ptr;
++}
++
+ /* The CAKE Principles:
+  *		   (or, how to have your cake and eat it too)
+  *
+@@ -2233,7 +2243,7 @@ static int cake_change(struct Qdisc *sch, struct nlattr *opt)
+ 	if (!opt)
+ 		return -EINVAL;
+ 
+-	err = nla_parse_nested(tb, TCA_CAKE_MAX, opt, cake_policy, NULL);
++	err = nla_parse_nested(tb, TCA_CAKE_MAX, opt, cake_policy);
+ 	if (err < 0)
+ 		return err;
+ 
+@@ -2373,8 +2383,8 @@ static int cake_init(struct Qdisc *sch, struct nlattr *opt)
+ 	for (i = 1; i <= CAKE_QUEUES; i++)
+ 		quantum_div[i] = 65535 / i;
+ 
+-	q->tins = kvzalloc(CAKE_MAX_TINS * sizeof(struct cake_tin_data),
+-			   GFP_KERNEL);
++	q->tins = cake_kvzalloc(CAKE_MAX_TINS * sizeof(struct cake_tin_data),
++				GFP_KERNEL);
+ 	if (!q->tins)
+ 		goto nomem;
+ 
+@@ -2482,7 +2492,7 @@ static int cake_dump_stats(struct Qdisc *sch, struct gnet_dump *d)
+ 	size_t size = sizeof(*st) + sizeof(struct tc_cake_tin_stats) * q->tin_cnt;
+ 	int i;
+ 
+-	st = kvzalloc(size, GFP_KERNEL);
++	st = cake_kvzalloc(size, GFP_KERNEL);
+ 
+ 	if (!st)
+ 		return -ENOMEM;
