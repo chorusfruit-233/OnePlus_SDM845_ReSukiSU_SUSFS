@@ -1,0 +1,126 @@
+name: Build OnePlus 6/6T Lineage 4.9 AK3
+
+on:
+  workflow_dispatch:
+    inputs:
+      resukisu_ref:
+        description: ReSukiSU branch, tag, or commit
+        required: false
+        default: main
+        type: string
+      susfs_ref:
+        description: SUSFS branch, tag, or commit
+        required: false
+        default: gki-android13-5.10
+        type: string
+      anykernel_ref:
+        description: AnyKernel3 branch, tag, or commit
+        required: false
+        default: master
+        type: string
+  schedule:
+    - cron: '17 18 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oneplus-sdm845-ak3-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      CONFIG: configs/enchilada.json
+      RESUKISU_REF: ${{ inputs.resukisu_ref || 'main' }}
+      SUSFS_REF: ${{ inputs.susfs_ref || 'gki-android13-5.10' }}
+      ANYKERNEL_REF: ${{ inputs.anykernel_ref || 'master' }}
+    steps:
+      - name: Checkout builder
+        uses: actions/checkout@v4
+
+      - name: Read configuration
+        id: config
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e . "$CONFIG" >/dev/null
+          for key in kernel_repo kernel_ref kernel_base defconfig arch cross_compile \
+                     resukisu_repo susfs_repo anykernel_repo; do
+            echo "$key=$(jq -r .$key "$CONFIG")" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential cpio flex gcc-aarch64-linux-gnu \
+            git libelf-dev libssl-dev python3 rsync unzip zip
+
+      - name: Clone pinned kernel base
+        run: |
+          git clone --depth=1 --branch '${{ steps.config.outputs.kernel_ref }}' \
+            '${{ steps.config.outputs.kernel_repo }}' kernel
+          test "$(git -C kernel rev-parse HEAD)" = \
+            '${{ steps.config.outputs.kernel_base }}'
+
+      - name: Apply 4.9 adaptation and fetch latest upstreams
+        run: |
+          set -euo pipefail
+          git -C kernel apply --whitespace=nowarn \
+            patches/lineage-4.9/kernel-4.9-adaptation.patch
+          scripts/prepare-sources.sh kernel \
+            '${{ steps.config.outputs.resukisu_repo }}' "$RESUKISU_REF" \
+            '${{ steps.config.outputs.susfs_repo }}' "$SUSFS_REF" \
+            patches/lineage-4.9 "$RUNNER_TEMP/susfs4ksu"
+
+      - name: Fetch latest AnyKernel3
+        run: |
+          git clone --filter=blob:none --no-checkout \
+            '${{ steps.config.outputs.anykernel_repo }}' anykernel3
+          git -C anykernel3 fetch --depth=1 origin "$ANYKERNEL_REF"
+          git -C anykernel3 checkout --detach FETCH_HEAD
+
+      - name: Configure kernel
+        working-directory: kernel
+        run: |
+          make O=out ARCH='${{ steps.config.outputs.arch }}' \
+            '${{ steps.config.outputs.defconfig }}'
+          make O=out ARCH='${{ steps.config.outputs.arch }}' olddefconfig
+          grep -E '^CONFIG_KSU(|_SUSFS.*)=y$' out/.config
+
+      - name: Build Image.gz-dtb
+        working-directory: kernel
+        run: |
+          make O=out ARCH='${{ steps.config.outputs.arch }}' \
+            CROSS_COMPILE='${{ steps.config.outputs.cross_compile }}' \
+            KCFLAGS=-Wno-error -j"$(nproc)" Image.gz-dtb
+
+      - name: Package AnyKernel3
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          resukisu_sha=$(git -C kernel/KernelSU rev-parse --short=8 HEAD)
+          susfs_sha=$(git -C "$RUNNER_TEMP/susfs4ksu" rev-parse --short=8 HEAD)
+          package="OnePlus6-6T-ReSukiSU-${resukisu_sha}-SUSFS-${susfs_sha}-AK3.zip"
+          scripts/package-ak3.sh anykernel3 \
+            kernel/out/arch/arm64/boot/Image.gz-dtb \
+            ak3/anykernel.sh "artifacts/$package"
+          sha256sum "artifacts/$package" > artifacts/SHA256SUMS
+          cp kernel/out/arch/arm64/boot/Image.gz-dtb artifacts/
+          {
+            echo "kernel=$(git -C kernel rev-parse HEAD)"
+            echo "resukisu=$(git -C kernel/KernelSU rev-parse HEAD)"
+            echo "susfs=$(git -C "$RUNNER_TEMP/susfs4ksu" rev-parse HEAD)"
+            echo "anykernel3=$(git -C anykernel3 rev-parse HEAD)"
+          } > artifacts/build-info.txt
+
+      - name: Upload AK3 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: OnePlus6-6T-lineage-4.9-ak3
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14

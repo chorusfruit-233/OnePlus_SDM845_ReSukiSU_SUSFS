@@ -1,0 +1,17 @@
+{
+  "model": "OnePlus6-6T",
+  "kernel_repo": "https://github.com/LineageOS/android_kernel_oneplus_sdm845.git",
+  "kernel_ref": "lineage-22.2",
+  "kernel_base": "2e921a892c03b8a17b4d82e9b24c2b3aa775c870",
+  "defconfig": "enchilada_defconfig",
+  "arch": "arm64",
+  "cross_compile": "aarch64-linux-gnu-",
+  "resukisu_repo": "https://github.com/ReSukiSU/ReSukiSU.git",
+  "resukisu_ref": "main",
+  "susfs_repo": "https://gitlab.com/simonpunk/susfs4ksu.git",
+  "susfs_ref": "gki-android13-5.10",
+  "anykernel_repo": "https://github.com/osm0sis/AnyKernel3.git",
+  "anykernel_ref": "master",
+  "device_names": ["enchilada", "fajita"],
+  "supported_versions": "15"
+}
