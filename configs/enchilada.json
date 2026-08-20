@@ -2,7 +2,7 @@
   "model": "OnePlus6-6T",
   "kernel_repo": "https://github.com/LineageOS/android_kernel_oneplus_sdm845.git",
   "kernel_ref": "lineage-22.2",
-  "kernel_base": "2e921a892c03b8a17b4d82e9b24c2b3aa775c870",
+  "kernel_base": "228c16bfcd256a546e3fde375215f6072135588f",
   "defconfig": "enchilada_defconfig",
   "arch": "arm64",
   "cross_compile": "aarch64-linux-gnu-",
