@@ -192,8 +192,12 @@ jobs:
 
       - name: Clone pinned kernel base
         run: |
-          git clone --depth=1 --branch '${{ steps.config.outputs.kernel_ref }}' \
+          git clone --filter=blob:none --no-checkout \
             '${{ steps.config.outputs.kernel_repo }}' kernel
+          git -C kernel fetch --depth=1 origin \
+            '${{ steps.config.outputs.kernel_base }}'
+          git -C kernel checkout --detach \
+            '${{ steps.config.outputs.kernel_base }}'
           test "$(git -C kernel rev-parse HEAD)" = \
             '${{ steps.config.outputs.kernel_base }}'
 
