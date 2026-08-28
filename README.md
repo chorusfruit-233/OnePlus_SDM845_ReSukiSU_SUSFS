@@ -9,6 +9,7 @@
 [![ReSukiSU](https://img.shields.io/badge/ReSukiSU-integrated-success)](https://github.com/ReSukiSU/ReSukiSU)
 [![SUSFS](https://img.shields.io/badge/SUSFS-v2.2.0_inline_hook-orange)](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd)
 [![Devices](https://img.shields.io/badge/devices-OnePlus_6%20%7C%206T-blue)](#兼容性)
+[![License](https://img.shields.io/badge/license-GPL--3.0-blue)](#许可证)
 
 </div>
 
@@ -220,6 +221,22 @@ tests/device/        SUSFS 设备端 syscall 回归测试
 
 这个边界是有意保留的：kernel 源码负责内核实现，本仓库负责可复现构建、动态上游追踪
 和产物发布。不要把 workflow、构建缓存或外部源码 checkout 复制回 kernel 仓库。
+
+## 许可证
+
+本仓库（构建脚本、workflow 与 4.9 适配补丁）以 [GPL-3.0](LICENSE) 发布。
+构建产物与集成内容遵循各自上游的许可证：
+
+| 组件 | 许可证 |
+| --- | --- |
+| Linux 内核（LineageOS 4.9 基线） | GPL-2.0 |
+| ReSukiSU | GPL-2.0 |
+| SUSFS v2.2.0（vendored 补丁） | GPL-2.0（源自 simonpunk/susfs4ksu） |
+| NoMount（vendored 补丁） | GPL-2.0（源自 maxsteeel/nomount） |
+| AnyKernel3（osm0sis） | GPL-3.0 |
+| Baseband Guard / CAKE / BBRv3 补丁 | 各自上游许可证 |
+
+刷写和使用本构建产物前，请确保你所在地区与用途允许修改和分发内核二进制。
 
 ## 问题反馈
 
