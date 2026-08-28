@@ -225,16 +225,9 @@ tests/device/        SUSFS 设备端 syscall 回归测试
 ## 许可证
 
 本仓库（构建脚本、workflow 与 4.9 适配补丁）以 [GPL-3.0](LICENSE) 发布。
-构建产物与集成内容遵循各自上游的许可证：
-
-| 组件 | 许可证 |
-| --- | --- |
-| Linux 内核（LineageOS 4.9 基线） | GPL-2.0 |
-| ReSukiSU | GPL-2.0 |
-| SUSFS v2.2.0（vendored 补丁） | GPL-2.0（源自 simonpunk/susfs4ksu） |
-| NoMount（vendored 补丁） | GPL-2.0（源自 maxsteeel/nomount） |
-| AnyKernel3（osm0sis） | GPL-3.0 |
-| Baseband Guard / CAKE / BBRv3 补丁 | 各自上游许可证 |
+集成的各上游组件（内核基线、ReSukiSU、SUSFS、NoMount、AnyKernel3、Baseband
+Guard、CAKE、BBRv3 补丁等）的许可证以**各自上游仓库声明为准**，本仓库不代为
+声明。
 
 刷写和使用本构建产物前，请确保你所在地区与用途允许修改和分发内核二进制。
 
