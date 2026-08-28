@@ -58,7 +58,7 @@ jobs:
       ANYKERNEL_REF: ${{ inputs.anykernel_ref || 'master' }}
     steps:
       - name: Checkout builder metadata
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Resolve upstream commits
         id: meta
@@ -104,7 +104,7 @@ jobs:
 
       - name: Check unchanged-input marker
         id: marker
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: .build-marker
           key: built-v1-${{ steps.meta.outputs.build_key }}
@@ -140,7 +140,7 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
     steps:
       - name: Checkout builder
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Read configuration
         id: config
@@ -164,7 +164,7 @@ jobs:
 
       - name: Restore compiler cache
         id: ccache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: .ccache
           key: ccache-v1-${{ runner.os }}-${{ needs.resolve-inputs.outputs.build_key }}
@@ -293,7 +293,7 @@ jobs:
 
       - name: Save compiler cache
         if: success() && steps.ccache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: .ccache
           key: ccache-v1-${{ runner.os }}-${{ needs.resolve-inputs.outputs.build_key }}
@@ -307,7 +307,7 @@ jobs:
 
       - name: Cache unchanged-input marker
         if: success() && needs.resolve-inputs.outputs.marker_hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: .build-marker
           key: built-v1-${{ needs.resolve-inputs.outputs.build_key }}
