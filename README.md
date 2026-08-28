@@ -66,6 +66,19 @@ ramdisk、内核模块或 vendor 接口差异而不兼容。不要在未备份�
   `vfs_getattr_nosec()` 路径，`-std=gnu99` 兼容 C99 循环声明（4.9 默认
   `-std=gnu89`）。
 
+### USB Wi-Fi（Kali/渗透测试）
+
+- 启用 Linux 4.9 树内已有的 USB Wi-Fi 驱动（不移植任何第三方驱动）：
+  `ath9k_htc`（AR9271）、`rt2800usb`（RT3070/5370/5572，含 5GHz）、
+  `mt7601u`、`carl9170`、`ar5523`、`rt2500usb`、`rt73usb`、`rtl8xxxu`；
+- 固件通过 `CONFIG_EXTRA_FIRMWARE` 内嵌进内核镜像（`htc_9271.fw`、
+  `rt2870.bin`、`mt7601u.bin`，构建时从 linux-firmware 拉取），不依赖
+  `/vendor` 固件目录；
+- `patches/lineage-4.9/ath9k-htc-symbols.patch` 将 ath9k 的 HTC 协议符号
+  加上 `ath9k_htc_hst_` 前缀，避免与 OnePlus 内置 `qcacld-3.0` WLAN 的
+  同名 `htc_*` 符号冲突（两者需同时编入内核）；
+- 驱动与固件全部 `=y` 编入 `Image.gz-dtb`，无需打包 `.ko`。
+
 ### 网络与容器
 
 - BBRv1 与 BBRv3，可在运行时保留 BBRv1 作为回退；
@@ -188,7 +201,11 @@ SUS_MOUNT 的 `/proc/self/mountinfo` 和 fdinfo。完整参数见
   `fs/susfs.c`、`include/linux/susfs.h`、`include/linux/susfs_def.h` 及内核钩子，
   并同步更新 `scripts/susfs-inline-hook.sh` 的版本说明；
 - `nomount-4.9.patch` 内嵌 NoMount `dev` 分支快照；NoMount 用户态组件（模块
-  ZIP 与 `nomount` 工具）不属于本仓库构建产物，需要从上游 release 单独获取。
+  ZIP 与 `nomount` 工具）不属于本仓库构建产物，需要从上游 release 单独获取；
+- USB Wi-Fi 仅覆盖 Linux 4.9 树内驱动（AR9271/RT3070/5370/5572/MT7601U 等）；
+  RTL8812AU、RTL8188EUS、MT76 等需要第三方驱动或较新内核的网卡不在支持范围；
+- `ath9k-htc-symbols.patch` 只改动了 ath9k 私有 HTC 协议符号名，不影响
+  `qcacld-3.0`；若上游 ath9k 代码大幅重构，需要重新生成该补丁。
 
 ## 仓库结构
 

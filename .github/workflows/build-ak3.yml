@@ -220,6 +220,11 @@ jobs:
           grep -E '^CONFIG_KSU(|_SUSFS.*)=y$' out/.config
           grep -qx 'CONFIG_KSU_SUSFS_OPEN_REDIRECT=y' out/.config
           grep -qx 'CONFIG_NOMOUNT=y' out/.config
+          grep -qx 'CONFIG_MAC80211=y' out/.config
+          grep -qx 'CONFIG_ATH9K_HTC=y' out/.config
+          grep -qx 'CONFIG_RT2800USB=y' out/.config
+          grep -qx 'CONFIG_MT7601U=y' out/.config
+          grep -q '^CONFIG_EXTRA_FIRMWARE="htc_9271.fw rt2870.bin mt7601u.bin"$' out/.config
           required=(
             CONFIG_SYSVIPC CONFIG_POSIX_MQUEUE CONFIG_NAMESPACES CONFIG_UTS_NS
             CONFIG_IPC_NS CONFIG_PID_NS CONFIG_USER_NS CONFIG_NET_NS
