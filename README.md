@@ -7,14 +7,15 @@
 [![Build AK3](https://github.com/chorusfruit-233/OnePlus_SDM845_ReSukiSU_SUSFS/actions/workflows/build-ak3.yml/badge.svg)](https://github.com/chorusfruit-233/OnePlus_SDM845_ReSukiSU_SUSFS/actions/workflows/build-ak3.yml)
 [![Kernel](https://img.shields.io/badge/kernel-4.9.337-informational)](https://github.com/LineageOS/android_kernel_oneplus_sdm845)
 [![ReSukiSU](https://img.shields.io/badge/ReSukiSU-integrated-success)](https://github.com/ReSukiSU/ReSukiSU)
-[![SUSFS](https://img.shields.io/badge/SUSFS-4.9_backport-orange)](https://gitlab.com/simonpunk/susfs4ksu)
+[![SUSFS](https://img.shields.io/badge/SUSFS-v2.2.0_inline_hook-orange)](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd)
 [![Devices](https://img.shields.io/badge/devices-OnePlus_6%20%7C%206T-blue)](#兼容性)
 
 </div>
 
 本仓库不是 kernel 源码仓库，而是一套独立的拉取、移植、编译、验证和打包流程。
-每次有效构建都会从固定的 LineageOS 4.9 最新基线开始，动态解析各上游项目的实际提交，
-应用本仓库维护的 4.9 适配补丁，最终输出可刷入的 AnyKernel3 ZIP。
+每次有效构建都会从固定的 LineageOS 4.9 最新基线开始，解析各上游项目的实际提交，
+应用本仓库维护的 4.9 适配补丁（SUSFS 以自包含补丁形式 vendored 在仓库内），
+最终输出可刷入的 AnyKernel3 ZIP。
 
 > [!WARNING]
 > 刷写自定义内核存在无法开机、数据损坏或需要恢复原厂 `boot` 的风险。请先备份当前
@@ -41,12 +42,17 @@ ramdisk、内核模块或 vendor 接口差异而不兼容。不要在未备份�
 ### ReSukiSU 与 SUSFS
 
 - 动态拉取 ReSukiSU `main` 的最新提交；
-- 将 SUSFS `gki-android13-5.10` backport 到 Linux 4.9；
-- 启用 SUS_PATH、SUS_MOUNT、SUS_KSTAT、SPOOF_UNAME、SUS_MAP、cmdline spoof
-  和符号隐藏；
-- 将 SUS_PATH 的 namei 状态语义映射到 4.9，并覆盖 open、stat、access、readlink、
-  getdents64、unlink、rename、`O_PATH` 与 `O_TRUNC`；
-- `CONFIG_KSU_SUSFS_OPEN_REDIRECT` 当前保持关闭，未把尚未完成真机回归的功能伪装成可用。
+- SUSFS **v2.2.0** 以自包含补丁形式 vendored（`patches/lineage-4.9/susfs-4.9.patch`，
+  基于 [JackA1ltman/NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd)
+  的 `susfs_patch_to_4.9.patch` 移植并修正），构建不再依赖 GitLab 上游；
+- 使用 SUSFS 官方 inline hook 方式（`scripts/susfs-inline-hook.sh`）替换 KernelSU
+  的 kprobe 钩子，覆盖 exec、faccessat、stat/fstat、read、input、reboot、
+  setresuid 与 selinux 路径，构建产物无 kprobe 依赖；
+- 启用 SUS_PATH、SUS_MOUNT、SUS_KSTAT、SPOOF_UNAME、SUS_MAP、cmdline spoof、
+  符号隐藏与 **OPEN_REDIRECT**；
+- SUS_PATH 覆盖 open、stat、access、readlink、getdents64、unlink、rename、
+  `O_PATH` 与 `O_TRUNC`，open redirect 覆盖普通 open、`O_PATH`、`O_TMPFILE`、
+  readlink、`/proc/self/fd`、maps/smaps 与 statfs。
 
 ### 网络与容器
 
@@ -106,15 +112,14 @@ artifact 包含：
 | 输入 | 默认值 | 说明 |
 | --- | --- | --- |
 | `resukisu_ref` | `main` | ReSukiSU branch、tag 或完整 commit |
-| `susfs_ref` | `gki-android13-5.10` | SUSFS branch、tag 或完整 commit |
 | `bbg_ref` | `main` | Baseband Guard branch、tag 或完整 commit |
 | `kernel_patches_ref` | `main` | WildKernels patches branch、tag 或完整 commit |
 | `anykernel_ref` | `master` | AnyKernel3 branch、tag 或完整 commit |
 | `force_rebuild` | `false` | 忽略无变化标记并强制完整构建 |
 
 定时任务每天在 `18:17 UTC`（北京时间次日 `02:17`）检查一次上游。workflow 会先将
-branch/tag 解析成不可变 commit，再把 kernel 基线、builder、补丁和所有上游 commit
-共同组成 build key：
+branch/tag 解析成不可变 commit，再把 kernel 基线、builder、补丁（含 vendored
+SUSFS 补丁的哈希）和所有上游 commit 共同组成 build key：
 
 - build key 未变化时，只运行约数秒的解析 job，跳过内核编译；
 - 输入变化时恢复最多 2 GiB 的 `ccache`，只重编译受影响对象；
@@ -126,7 +131,7 @@ branch/tag 解析成不可变 commit，再把 kernel 基线、builder、补丁�
 | --- | --- | --- |
 | Kernel | [LineageOS/android_kernel_oneplus_sdm845](https://github.com/LineageOS/android_kernel_oneplus_sdm845) | 固定基线 commit |
 | ReSukiSU | [ReSukiSU/ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) | 默认跟踪 `main` |
-| SUSFS | [simonpunk/susfs4ksu](https://gitlab.com/simonpunk/susfs4ksu) | 默认跟踪 `gki-android13-5.10` |
+| SUSFS v2.2.0 | 自包含补丁（源自 [JackA1ltman/NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd)） | vendored，随仓库版本变化 |
 | CAKE | [dtaht/sch_cake](https://github.com/dtaht/sch_cake) | 固定最后一版兼容旧 qdisc API 的基线 |
 | BBRv3 patches | [WildKernels/kernel_patches](https://github.com/WildKernels/kernel_patches) | 稀疏拉取 `common/bbrv3` |
 | Baseband Guard | [vc-teahouse/Baseband-guard](https://github.com/vc-teahouse/Baseband-guard) | 默认跟踪 `main` |
@@ -164,8 +169,11 @@ SUS_MOUNT 的 `/proc/self/mountinfo` 和 fdinfo。完整参数见
 - CAKE 固定在 `15f1f6c` 兼容基线，当前 upstream `master` 依赖新版 `tcf_block` 和
   extack API，不能直接放入 4.9；
 - 编译成功不等于所有 ROM 上均已完成启动、基带、网络和容器稳定性验证；
-- `kernel_base` 变化后必须重新生成并验证 `kernel-4.9-adaptation.patch`，不能只修改
-  配置中的 commit 绕过基线检查。
+- `kernel_base` 变化后必须重新生成并验证 `kernel-4.9-adaptation.patch` 和
+  `susfs-4.9.patch`，不能只修改配置中的 commit 绕过基线检查；
+- `susfs-4.9.patch` 内嵌 SUSFS v2.2.0 源码；升级 SUSFS 版本时需要重新移植
+  `fs/susfs.c`、`include/linux/susfs.h`、`include/linux/susfs_def.h` 及内核钩子，
+  并同步更新 `scripts/susfs-inline-hook.sh` 的版本说明。
 
 ## 仓库结构
 
@@ -174,7 +182,7 @@ SUS_MOUNT 的 `/proc/self/mountinfo` 和 fdinfo。完整参数见
 ak3/                 OnePlus 6/6T AnyKernel3 模板
 configs/             设备、kernel 和上游配置
 patches/lineage-4.9/ Linux 4.9 主补丁及 SUSFS/CAKE/BBRv3 适配
-scripts/             动态拉取上游与 AK3 打包脚本
+scripts/             动态拉取上游、SUSFS inline hook 与 AK3 打包脚本
 tests/device/        SUSFS 设备端 syscall 回归测试
 ```
 
@@ -205,3 +213,4 @@ tests/device/        SUSFS 设备端 syscall 回归测试
 - [osm0sis / AnyKernel3](https://github.com/osm0sis/AnyKernel3)
 - [ravindu644 / Droidspaces](https://github.com/ravindu644/Droidspaces-OSS)
 - [huangdihd / OnePlus_ReSukiSU_SUSFS](https://github.com/huangdihd/OnePlus_ReSukiSU_SUSFS)
+- [JackA1ltman / NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd)

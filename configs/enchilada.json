@@ -8,8 +8,6 @@
   "cross_compile": "aarch64-linux-gnu-",
   "resukisu_repo": "https://github.com/ReSukiSU/ReSukiSU.git",
   "resukisu_ref": "main",
-  "susfs_repo": "https://gitlab.com/simonpunk/susfs4ksu.git",
-  "susfs_ref": "gki-android13-5.10",
   "cake_repo": "https://github.com/dtaht/sch_cake.git",
   "cake_ref": "15f1f6c0665213d1f1fbe7d315e0cbd75cdbf861",
   "bbg_repo": "https://github.com/vc-teahouse/Baseband-guard.git",
