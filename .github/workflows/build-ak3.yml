@@ -28,11 +28,21 @@ on:
         required: false
         default: false
         type: boolean
+      create_release:
+        description: Create a GitHub Release with the AK3 zip and checksums
+        required: false
+        default: false
+        type: boolean
+      release_tag:
+        description: Release tag (auto-generated as v1.0.0-<timestamp> if empty)
+        required: false
+        default: ''
+        type: string
   schedule:
     - cron: '17 18 * * *'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: oneplus-sdm845-ak3-${{ github.ref }}
@@ -295,6 +305,35 @@ jobs:
           path: artifacts/
           if-no-files-found: error
           retention-days: 14
+
+      - name: Create GitHub Release
+        if: ${{ inputs.create_release == true }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${{ inputs.release_tag }}" ]]; then
+            tag="${{ inputs.release_tag }}"
+          else
+            tag="v1.0.0-$(date +%Y%m%d-%H%M%S)"
+          fi
+
+          notes="## 构建信息
+
+          $(awk -F= '{printf "- **%s**: \`%s\`\n", $1, $2}' artifacts/build-info.txt)
+
+          ## 使用
+
+          1. 解压 action artifact 后，核对 \`SHA256SUMS\` 再刷入 \`*-AK3.zip\`；
+          2. 本 release 的资产即 artifact 内对应文件，校验值见 \`SHA256SUMS\`。"
+
+          gh release create "$tag" \
+            artifacts/*-AK3.zip artifacts/SHA256SUMS \
+            artifacts/build-info.txt artifacts/Image.gz-dtb \
+            --title "OnePlus 6/6T ReSukiSU + SUSFS $(date +%Y-%m-%d)" \
+            --notes "$notes"
+          echo "Created release: $tag"
 
       - name: Save compiler cache
         if: success() && steps.ccache.outputs.cache-hit != 'true'
