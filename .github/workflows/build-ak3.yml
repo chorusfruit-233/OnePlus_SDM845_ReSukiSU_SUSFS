@@ -284,7 +284,7 @@ jobs:
           } > artifacts/build-info.txt
 
       - name: Upload AK3 artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: OnePlus6-6T-lineage-4.9-ak3
           path: artifacts/
