@@ -54,6 +54,18 @@ ramdisk、内核模块或 vendor 接口差异而不兼容。不要在未备份�
   `O_PATH` 与 `O_TRUNC`，open redirect 覆盖普通 open、`O_PATH`、`O_TMPFILE`、
   readlink、`/proc/self/fd`、maps/smaps 与 statfs。
 
+### NoMount
+
+- [maxsteeel/NoMount](https://github.com/maxsteeel/nomount)（dev @
+  `0288c11263e6`）以自包含补丁 vendored（`patches/lineage-4.9/nomount-4.9.patch`）；
+- NoMount 通过劫持目录 inode 操作实现路径重定向与虚拟文件注入，不需要真正的
+  mount，配合 SUSFS 的 SUS_MOUNT 使用可进一步隐藏模块挂载痕迹；
+- 内核侧启用 `CONFIG_NOMOUNT=y`（同时启用 `CONFIG_KEYS=y` 提供 keyring
+  用户态接口），userspace 规则通过 `nomount` 密钥类型下发；
+- 针对本树回移的 statx API 做了适配：`-DNOMOUNT_HAS_STATX` 强制走四参数
+  `vfs_getattr_nosec()` 路径，`-std=gnu99` 兼容 C99 循环声明（4.9 默认
+  `-std=gnu89`）。
+
 ### 网络与容器
 
 - BBRv1 与 BBRv3，可在运行时保留 BBRv1 作为回退；
@@ -132,6 +144,7 @@ SUSFS 补丁的哈希）和所有上游 commit 共同组成 build key：
 | Kernel | [LineageOS/android_kernel_oneplus_sdm845](https://github.com/LineageOS/android_kernel_oneplus_sdm845) | 固定基线 commit |
 | ReSukiSU | [ReSukiSU/ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) | 默认跟踪 `main` |
 | SUSFS v2.2.0 | 自包含补丁（源自 [JackA1ltman/NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd)） | vendored，随仓库版本变化 |
+| NoMount | [maxsteeel/nomount](https://github.com/maxsteeel/nomount)（dev 分支） | vendored，固定 `0288c11263e6` |
 | CAKE | [dtaht/sch_cake](https://github.com/dtaht/sch_cake) | 固定最后一版兼容旧 qdisc API 的基线 |
 | BBRv3 patches | [WildKernels/kernel_patches](https://github.com/WildKernels/kernel_patches) | 稀疏拉取 `common/bbrv3` |
 | Baseband Guard | [vc-teahouse/Baseband-guard](https://github.com/vc-teahouse/Baseband-guard) | 默认跟踪 `main` |
@@ -173,7 +186,9 @@ SUS_MOUNT 的 `/proc/self/mountinfo` 和 fdinfo。完整参数见
   `susfs-4.9.patch`，不能只修改配置中的 commit 绕过基线检查；
 - `susfs-4.9.patch` 内嵌 SUSFS v2.2.0 源码；升级 SUSFS 版本时需要重新移植
   `fs/susfs.c`、`include/linux/susfs.h`、`include/linux/susfs_def.h` 及内核钩子，
-  并同步更新 `scripts/susfs-inline-hook.sh` 的版本说明。
+  并同步更新 `scripts/susfs-inline-hook.sh` 的版本说明；
+- `nomount-4.9.patch` 内嵌 NoMount `dev` 分支快照；NoMount 用户态组件（模块
+  ZIP 与 `nomount` 工具）不属于本仓库构建产物，需要从上游 release 单独获取。
 
 ## 仓库结构
 
@@ -214,3 +229,4 @@ tests/device/        SUSFS 设备端 syscall 回归测试
 - [ravindu644 / Droidspaces](https://github.com/ravindu644/Droidspaces-OSS)
 - [huangdihd / OnePlus_ReSukiSU_SUSFS](https://github.com/huangdihd/OnePlus_ReSukiSU_SUSFS)
 - [JackA1ltman / NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd)
+- [maxsteeel / NoMount](https://github.com/maxsteeel/nomount)

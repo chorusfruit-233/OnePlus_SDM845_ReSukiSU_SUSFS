@@ -42,6 +42,10 @@ ln -sfn ../KernelSU/kernel "$kernel_root/drivers/kernelsu"
 git -C "$kernel_root" apply --whitespace=nowarn \
     "$patch_root/susfs-4.9.patch"
 
+# NoMount path redirection subsystem (vendored from maxsteeel/nomount).
+git -C "$kernel_root" apply --whitespace=nowarn \
+    "$patch_root/nomount-4.9.patch"
+
 # Replace KernelSU's kprobe hooks with SUSFS inline hooks (no-kprobe mode).
 bash "$script_dir/susfs-inline-hook.sh" "$kernel_root"
 
@@ -70,6 +74,8 @@ test -L "$kernel_root/drivers/kernelsu"
 test -f "$kernel_root/fs/susfs.c"
 test -f "$kernel_root/include/linux/susfs.h"
 test -f "$kernel_root/include/linux/susfs_def.h"
+test -f "$kernel_root/fs/nomount/nomount.c"
+test -f "$kernel_root/fs/nomount/nomount.h"
 test -f "$kernel_root/net/sched/sch_cake.c"
 test -f "$kernel_root/net/ipv4/tcp_bbr3.c"
 test -L "$kernel_root/security/baseband-guard"
@@ -84,6 +90,7 @@ grep -q 'atomic_t filter_count' "$kernel_root/include/linux/seccomp.h"
 
 echo "ReSukiSU commit: $(git -C "$kernel_root/KernelSU" rev-parse HEAD)"
 echo "SUSFS patch: $patch_root/susfs-4.9.patch ($(sha256sum "$patch_root/susfs-4.9.patch" | cut -c1-12))"
+echo "NoMount patch: $patch_root/nomount-4.9.patch ($(sha256sum "$patch_root/nomount-4.9.patch" | cut -c1-12))"
 echo "CAKE commit: $(git -C "$cake_checkout" rev-parse HEAD)"
 echo "Baseband Guard commit: $(git -C "$kernel_root/Baseband-guard" rev-parse HEAD)"
 echo "Kernel patches commit: $(git -C "$patches_checkout" rev-parse HEAD)"

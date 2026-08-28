@@ -219,6 +219,7 @@ jobs:
           make O=out ARCH='${{ steps.config.outputs.arch }}' olddefconfig
           grep -E '^CONFIG_KSU(|_SUSFS.*)=y$' out/.config
           grep -qx 'CONFIG_KSU_SUSFS_OPEN_REDIRECT=y' out/.config
+          grep -qx 'CONFIG_NOMOUNT=y' out/.config
           required=(
             CONFIG_SYSVIPC CONFIG_POSIX_MQUEUE CONFIG_NAMESPACES CONFIG_UTS_NS
             CONFIG_IPC_NS CONFIG_PID_NS CONFIG_USER_NS CONFIG_NET_NS
@@ -275,6 +276,7 @@ jobs:
             echo "kernel=$(git -C kernel rev-parse HEAD)"
             echo "resukisu=$(git -C kernel/KernelSU rev-parse HEAD)"
             echo "susfs=v2.2.0-vendored ($(sha256sum patches/lineage-4.9/susfs-4.9.patch | cut -c1-12))"
+            echo "nomount=vendored ($(sha256sum patches/lineage-4.9/nomount-4.9.patch | cut -c1-12))"
             echo "cake=$(git -C "$RUNNER_TEMP/sch_cake" rev-parse HEAD)"
             echo "baseband_guard=$(git -C kernel/Baseband-guard rev-parse HEAD)"
             echo "kernel_patches=$(git -C "$RUNNER_TEMP/kernel_patches" rev-parse HEAD)"
