@@ -80,6 +80,19 @@ ramdisk、内核模块或 vendor 接口差异而不兼容。不要在未备份�
   同名 `htc_*` 符号冲突（两者需同时编入内核）；
 - 驱动与固件全部 `=y` 编入 `Image.gz-dtb`，无需打包 `.ko`。
 
+### KPM（KPatch-Next）
+
+- 内核启用 `CONFIG_KALLSYMS=y` + `CONFIG_KALLSYMS_ALL=y`（ReSukiSU 自动
+  select），满足 [KPatch-Next](https://github.com/KernelSU-Next/KPatch-Next)
+  的镜像静态 patch 要求 —— KPatch-Next 直接 patch 编译好的内核镜像，
+  **不需要任何内核源码补丁**；
+- 与 SUSFS 符号隐藏兼容：隐藏只作用于 `/proc/kallsyms` 输出，不影响镜像内
+  编译生成的 kallsyms 符号表；
+- 使用方式：刷入 [KPatch-Next-Module](https://github.com/KernelSU-Next/KPatch-Next-Module)
+  （Magisk/KernelSU 通用模块，自带 kpatch/kpimg 与 WebUI），用其管理 KPM
+  模块即可；本仓库的内核无需额外配置；
+- Actions 会检查 `CONFIG_KALLSYMS`/`CONFIG_KALLSYMS_ALL`，缺失即终止构建。
+
 ### 网络与容器
 
 - BBRv1 与 BBRv3，可在运行时保留 BBRv1 作为回退；
