@@ -51,6 +51,10 @@ git -C "$kernel_root" apply --whitespace=nowarn \
 git -C "$kernel_root" apply --whitespace=nowarn \
     "$patch_root/ath9k-htc-symbols.patch"
 
+# ReKernel-X v9.2 (drivers/rekernel + binder/signal hooks).
+git -C "$kernel_root" apply --whitespace=nowarn \
+    "$patch_root/rekernel-4.9.patch"
+
 # Replace KernelSU's kprobe hooks with SUSFS inline hooks (no-kprobe mode).
 bash "$script_dir/susfs-inline-hook.sh" "$kernel_root"
 
@@ -104,6 +108,9 @@ test -f "$kernel_root/firmware/rt2870.bin"
 test -f "$kernel_root/firmware/mt7601u.bin"
 grep -q 'ath9k_htc_hst_connect_service' \
     "$kernel_root/drivers/net/wireless/ath/ath9k/htc_hst.h"
+test -f "$kernel_root/drivers/rekernel/rekernel.c"
+grep -q 'rekernel_binder_transaction' "$kernel_root/drivers/android/binder.c"
+grep -q 'rekernel_report(SIGNAL' "$kernel_root/kernel/signal.c"
 grep -q 'KSTAT_SPOOF_CTIME_TV_SEC (1 << 8)' "$kernel_root/include/linux/susfs.h"
 grep -q 'SUSFS_VERSION "v2.2.0"' "$kernel_root/include/linux/susfs.h"
 grep -q 'ksu_handle_execveat_sucompat' "$kernel_root/fs/exec.c"

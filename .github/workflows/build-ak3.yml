@@ -238,6 +238,9 @@ jobs:
           # KPatch-Next / KPM requirement (kernel image static patching)
           grep -qx 'CONFIG_KALLSYMS=y' out/.config
           grep -qx 'CONFIG_KALLSYMS_ALL=y' out/.config
+          # ReKernel-X
+          grep -qx 'CONFIG_REKERNEL=y' out/.config
+          grep -qx '# CONFIG_REKERNEL_NETWORK is not set' out/.config
           required=(
             CONFIG_SYSVIPC CONFIG_POSIX_MQUEUE CONFIG_NAMESPACES CONFIG_UTS_NS
             CONFIG_IPC_NS CONFIG_PID_NS CONFIG_USER_NS CONFIG_NET_NS

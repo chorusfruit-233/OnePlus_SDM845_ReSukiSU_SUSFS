@@ -93,6 +93,21 @@ ramdisk、内核模块或 vendor 接口差异而不兼容。不要在未备份�
   模块即可；本仓库的内核无需额外配置；
 - Actions 会检查 `CONFIG_KALLSYMS`/`CONFIG_KALLSYMS_ALL`，缺失即终止构建。
 
+### ReKernel-X
+
+- [myflavor/ReKernel-X](https://github.com/myflavor/ReKernel-X)（upstream/v9.2
+  Integrate）以自包含补丁 vendored（`patches/lineage-4.9/rekernel-4.9.patch`）；
+- 新增 `drivers/rekernel/`（netlink 上报模块，`CONFIG_REKERNEL=y`，
+  `CONFIG_REKERNEL_NETWORK=n`）；
+- `drivers/android/binder.c`：移植冻结进程的 async 事务合并处理
+  （`binder_can_update_transaction`/`binder_find_outdated_transaction_ilocked`，
+  4.9 变体不含 `binder_buffer->pid` 与 `proc->outstanding_txns`）+ 事务上报
+  hook；`kernel/signal.c`：SIGKILL/SIGTERM/SIGABRT/SIGQUIT 上报；
+- 4.9 适配：`JOBCTL_TRAP_FREEZE` 为 4.11+ 引入，`jobctl_frozen()` 回退使用
+  `frozen()/freezing()`；
+- 配合 ReKernel 用户态（tombstone 冻结优化）使用；Actions 检查
+  `CONFIG_REKERNEL`。
+
 ### 网络与容器
 
 - BBRv1 与 BBRv3，可在运行时保留 BBRv1 作为回退；
