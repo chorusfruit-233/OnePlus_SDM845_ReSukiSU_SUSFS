@@ -1,16 +1,20 @@
-ReKernel-X v9.2 kernel integration (drivers/rekernel + binder/signal hooks)
+Re:Kernel kernel integration (drivers/rekernel + binder/signal hooks)
 
-Sourced from https://github.com/myflavor/ReKernel-X (branch upstream/v9.2,
-Integrate/), adapted for the LineageOS 4.9.337 base:
+Sourced from https://github.com/Sakion-Team/Re-Kernel (main, Integrate/;
+rekernel.c/rekernel.h/Kconfig/Makefile are identical in the ReKernel-X
+upstream/v9.2 fork), adapted for the LineageOS 4.9.337 base:
 
 - drivers/rekernel/{Kconfig,Makefile,rekernel.c,rekernel.h} verbatim
   (GPL-2.0), with CONFIG_REKERNEL=y / CONFIG_REKERNEL_NETWORK=n;
-- drivers/android/binder.c: port of the frozen-process async transaction
-  handling (binder_can_update_transaction()/
-  binder_find_outdated_transaction_ilocked(), the 4.9 variant without
-  binder_buffer->pid and proc->outstanding_txns) plus the
+- drivers/android/binder.c: frozen-process async transaction handling
+  (binder_can_update_transaction()/
+  binder_find_outdated_transaction_ilocked()) plus the
   rekernel_binder_transaction() netlink report hook before
-  trace_binder_transaction();
+  trace_binder_transaction(). The upstream patches.sh variant keys the
+  merge on TF_UPDATE_TXN (binder update transactions, 4.14+); this tree
+  has no TF_UPDATE_TXN, so the merge applies to every async transaction
+  of a frozen process (ReKernel-X v9.2 wording) and drops the fields
+  that do not exist here (binder_buffer->pid, proc->outstanding_txns);
 - kernel/signal.c: rekernel_report(SIGNAL, ...) for SIGKILL/SIGTERM/
   SIGABRT/SIGQUIT in do_send_sig_info();
 - drivers/Kconfig + drivers/Makefile wiring.

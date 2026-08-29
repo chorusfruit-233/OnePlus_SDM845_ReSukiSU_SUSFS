@@ -93,10 +93,11 @@ ramdisk、内核模块或 vendor 接口差异而不兼容。不要在未备份�
   模块即可；本仓库的内核无需额外配置；
 - Actions 会检查 `CONFIG_KALLSYMS`/`CONFIG_KALLSYMS_ALL`，缺失即终止构建。
 
-### ReKernel-X
+### Re:Kernel
 
-- [myflavor/ReKernel-X](https://github.com/myflavor/ReKernel-X)（upstream/v9.2
-  Integrate）以自包含补丁 vendored（`patches/lineage-4.9/rekernel-4.9.patch`）；
+- [Sakion-Team/Re-Kernel](https://github.com/Sakion-Team/Re-Kernel)（Integrate，
+  rekernel 源码与 ReKernel-X upstream/v9.2 相同）以自包含补丁 vendored
+  （`patches/lineage-4.9/rekernel-4.9.patch`）；
 - 新增 `drivers/rekernel/`（netlink 上报模块，`CONFIG_REKERNEL=y`，
   `CONFIG_REKERNEL_NETWORK=n`）；
 - `drivers/android/binder.c`：移植冻结进程的 async 事务合并处理
