@@ -67,6 +67,8 @@ git -C "$kernel_root" apply --whitespace=nowarn \
     "$patch_root/cake-4.9-adaptation.patch"
 
 clone_ref "$bbg_repo" "$bbg_ref" "$kernel_root/Baseband-guard"
+git -C "$kernel_root/Baseband-guard" apply --whitespace=nowarn \
+    "$patch_root/bbg-slot-allow.patch"
 ln -sfn ../Baseband-guard "$kernel_root/security/baseband-guard"
 ln -sfn ../../../Baseband-guard/tracing/tracing.h \
     "$kernel_root/security/selinux/include/bbg_tracing.h"

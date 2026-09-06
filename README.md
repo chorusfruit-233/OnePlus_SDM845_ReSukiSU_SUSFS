@@ -122,6 +122,11 @@ ramdisk、内核模块或 vendor 接口差异而不兼容。不要在未备份�
 
 - Baseband Guard 通过 Linux 4.9 旧式 LSM/SELinux 路径接入；
 - 默认不阻止 boot/recovery 写入，避免干扰正常刷写和救砖流程；
+- `bbg-slot-allow.patch`（构建时应用到 Baseband Guard）修复 A/B 槽位放行
+  缺陷：原版在内核 cmdline 存在 `androidboot.slot_suffix` 时只放行当前槽
+  分区，导致 root 工具无法刷写 **inactive 槽**（OTA/手动更新另一槽内核时报
+  EPERM）；修复后 allowlist 分区（boot/dtbo/vbmeta 等）的 `_a`/`_b` 两个槽
+  均可写。
 - 可选的 CPUfreq `scaling_min_freq_limit`；
 - arm64 copy prefetch、页面与 `struct file` 对齐、VFS cache pressure 调整；
 - F2FS urgent GC 间隔和 alarmtimer 精确唤醒窗口优化。

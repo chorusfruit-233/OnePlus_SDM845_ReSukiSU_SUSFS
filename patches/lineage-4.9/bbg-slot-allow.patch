@@ -1,0 +1,39 @@
+Allow both A/B slots for writable (allowlisted) partitions
+
+partition_name_in_allowlist() pins the partition match to the slot
+reported by androidboot.slot_suffix on the kernel cmdline and then
+continues to the next allowlist entry, so the *inactive* slot is never
+accepted. On OnePlus 6/6T (and any A/B device whose bootloader passes
+slot_suffix) an untrusted process - e.g. KernelSU-su spawned kernel
+flashers - can therefore write the current slot's boot/dtbo but gets
+EPERM on the other slot, breaking inactive-slot kernel flashing and
+manual OTA prep.
+
+The allowlist entries are partitions meant to be writable (boot,
+init_boot, vendor_boot, dtbo, vbmeta, userdata, ...; BLOCK_BOOT/
+BLOCK_RECOVERY only remove boot/recovery from it). Accept both "_a"
+and "_b" variants after the slot-suffix check fails instead of
+skipping the entry.
+
+Signed-off-by: OnePlus_SDM845_ReSukiSU_SUSFS builder
+---
+diff --git a/blkdev_helper.c b/blkdev_helper.c
+index ffeacc6..5f2cd77 100644
+--- a/blkdev_helper.c
++++ b/blkdev_helper.c
+@@ -70,7 +70,14 @@ static bool partition_name_in_allowlist(const char *name, size_t max_len)
+ 						   allowed, slot_suffix))
+ 				return true;
+ 
+-			continue;
++			/*
++			 * The allowlist covers partitions that are meant to be
++			 * writable (e.g. boot/dtbo when BLOCK_BOOT is off), so
++			 * both A/B slots must be accepted even when the kernel
++			 * cmdline pins the currently booted slot. Otherwise
++			 * writing the *inactive* slot - which OTA flows and
++			 * kernel flashers need - is wrongly denied.
++			 */
+ 		}
+ 
+ 		if (partition_name_matches(name, name_len,
