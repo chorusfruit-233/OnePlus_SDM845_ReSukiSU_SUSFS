@@ -1,3 +1,17 @@
+SUSFS v2.3.0 self-contained 4.9 patch (based on
+JackA1ltman/NonGKI_Kernel_Build_2nd susfs_patch_to_4.9.patch @ 4fc7cc0)
+
+Same integration as the previous v2.2.0 vendored patch:
+- fs/susfs.c, include/linux/susfs.h, include/linux/susfs_def.h plus the
+  namei/namespace/proc/stat/kallsyms/sys/memory/selinux hooks;
+- LineageOS 4.9.337 adaptations kept from the v2.2.0 port:
+  fs/proc/cmdline.c and fs/proc/task_mmu.c (show_map_vma) rewritten for
+  this tree;
+- bug fixes kept: KSTAT_SPOOF_CTIME_TV_SEC bit typo, spoofed_size
+  format strings (%u -> %llu, four sites in v2.3.0), vfs_readlink
+  redirect return value and its generic_readlink() call site, cmdline
+  spoof branch uses static_branch_unlikely.
+---
 diff --git a/fs/Makefile b/fs/Makefile
 index 3cfd698bbdc8..5b4103c39ced 100644
 --- a/fs/Makefile
@@ -3347,7 +3361,7 @@ index 000000000000..f17bc199e0f3
 +
 diff --git a/include/linux/susfs.h b/include/linux/susfs.h
 new file mode 100644
-index 000000000000..e2d685f5889e
+index 000000000000..1b1b697cb4a9
 --- /dev/null
 +++ b/include/linux/susfs.h
 @@ -0,0 +1,241 @@
@@ -3362,7 +3376,7 @@ index 000000000000..e2d685f5889e
 +#include <linux/susfs_def.h>
 +#include <linux/statfs.h>
 +
-+#define SUSFS_VERSION "v2.2.0"
++#define SUSFS_VERSION "v2.3.0"
 +#if LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
 +#define SUSFS_VARIANT "NON-GKI"
 +#else

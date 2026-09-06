@@ -7,7 +7,7 @@
 [![Build AK3](https://github.com/chorusfruit-233/OnePlus_SDM845_ReSukiSU_SUSFS/actions/workflows/build-ak3.yml/badge.svg)](https://github.com/chorusfruit-233/OnePlus_SDM845_ReSukiSU_SUSFS/actions/workflows/build-ak3.yml)
 [![Kernel](https://img.shields.io/badge/kernel-4.9.337-informational)](https://github.com/LineageOS/android_kernel_oneplus_sdm845)
 [![ReSukiSU](https://img.shields.io/badge/ReSukiSU-integrated-success)](https://github.com/ReSukiSU/ReSukiSU)
-[![SUSFS](https://img.shields.io/badge/SUSFS-v2.2.0_inline_hook-orange)](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd)
+[![SUSFS](https://img.shields.io/badge/SUSFS-v2.3.0_inline_hook-orange)](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd)
 [![Devices](https://img.shields.io/badge/devices-OnePlus_6%20%7C%206T-blue)](#兼容性)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](#许可证)
 
@@ -43,7 +43,7 @@ ramdisk、内核模块或 vendor 接口差异而不兼容。不要在未备份�
 ### ReSukiSU 与 SUSFS
 
 - 动态拉取 ReSukiSU `main` 的最新提交；
-- SUSFS **v2.2.0** 以自包含补丁形式 vendored（`patches/lineage-4.9/susfs-4.9.patch`，
+- SUSFS **v2.3.0** 以自包含补丁形式 vendored（`patches/lineage-4.9/susfs-4.9.patch`，
   基于 [JackA1ltman/NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd)
   的 `susfs_patch_to_4.9.patch` 移植并修正），构建不再依赖 GitLab 上游；
 - 使用 SUSFS 官方 inline hook 方式（`scripts/susfs-inline-hook.sh`）替换 KernelSU
@@ -186,7 +186,7 @@ SUSFS 补丁的哈希）和所有上游 commit 共同组成 build key：
 | --- | --- | --- |
 | Kernel | [LineageOS/android_kernel_oneplus_sdm845](https://github.com/LineageOS/android_kernel_oneplus_sdm845) | 固定基线 commit |
 | ReSukiSU | [ReSukiSU/ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) | 默认跟踪 `main` |
-| SUSFS v2.2.0 | 自包含补丁（源自 [JackA1ltman/NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd)） | vendored，随仓库版本变化 |
+| SUSFS v2.3.0 | 自包含补丁（源自 [JackA1ltman/NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd)） | vendored，随仓库版本变化 |
 | NoMount | [maxsteeel/nomount](https://github.com/maxsteeel/nomount)（dev 分支） | vendored，固定 `0288c11263e6` |
 | CAKE | [dtaht/sch_cake](https://github.com/dtaht/sch_cake) | 固定最后一版兼容旧 qdisc API 的基线 |
 | BBRv3 patches | [WildKernels/kernel_patches](https://github.com/WildKernels/kernel_patches) | 稀疏拉取 `common/bbrv3` |
@@ -227,7 +227,7 @@ SUS_MOUNT 的 `/proc/self/mountinfo` 和 fdinfo。完整参数见
 - 编译成功不等于所有 ROM 上均已完成启动、基带、网络和容器稳定性验证；
 - `kernel_base` 变化后必须重新生成并验证 `kernel-4.9-adaptation.patch` 和
   `susfs-4.9.patch`，不能只修改配置中的 commit 绕过基线检查；
-- `susfs-4.9.patch` 内嵌 SUSFS v2.2.0 源码；升级 SUSFS 版本时需要重新移植
+- `susfs-4.9.patch` 内嵌 SUSFS v2.3.0 源码；升级 SUSFS 版本时需要重新移植
   `fs/susfs.c`、`include/linux/susfs.h`、`include/linux/susfs_def.h` 及内核钩子，
   并同步更新 `scripts/susfs-inline-hook.sh` 的版本说明；
 - `nomount-4.9.patch` 内嵌 NoMount `dev` 分支快照；NoMount 用户态组件（模块
