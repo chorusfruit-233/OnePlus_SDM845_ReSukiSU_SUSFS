@@ -14,8 +14,13 @@
   "bbg_ref": "main",
   "kernel_patches_repo": "https://github.com/WildKernels/kernel_patches.git",
   "kernel_patches_ref": "main",
+  "rtl8812au_repo": "https://github.com/aircrack-ng/rtl8812au.git",
+  "rtl8812au_ref": "v5.6.4.2",
   "anykernel_repo": "https://github.com/osm0sis/AnyKernel3.git",
   "anykernel_ref": "master",
-  "device_names": ["enchilada", "fajita"],
+  "device_names": [
+    "enchilada",
+    "fajita"
+  ],
   "supported_versions": "15"
 }

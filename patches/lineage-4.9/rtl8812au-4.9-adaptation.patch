@@ -1,0 +1,72 @@
+rtl8812au/8821au/8814au out-of-tree driver (aircrack-ng) for 4.9
+
+Integrates https://github.com/aircrack-ng/rtl8812au (v5.6.4.2) into
+drivers/net/wireless/realtek/rtl8812au/ as a built-in driver and adapts
+it to this tree:
+
+- the LineageOS 4.9.337 kernel backports the modern cfg80211 ABI:
+  cfg80211_roamed() takes struct cfg80211_roam_info and
+  cfg80211_connect_bss() takes the timeout argument. The driver's
+  version checks (LINUX_VERSION_CODE >= 4.12/4.10) select the legacy
+  prototypes, so -DCONFIG_RTW_CFG80211_NEW_ABI and
+  -DCONFIG_CFG80211_CONNECT_BSS_ANDROID force the new-ABI paths;
+- drivers/net/wireless/realtek/{Kconfig,Makefile} wire the directory in
+  via CONFIG_88XXAU (=y, built into Image.gz-dtb, no .ko packaging).
+
+Enables RTL8812AU/RTL8821AU/RTL8814AU USB adapters (monitor mode and
+injection capable, the usual Kali/aircrack-ng chipsets) on top of the
+in-tree drivers already enabled.
+---
+--- a/drivers/net/wireless/realtek/rtl8812au/Makefile	2026-09-13 08:49:51.206959618 +0800
++++ b/drivers/net/wireless/realtek/rtl8812au/Makefile	2026-09-13 08:48:29.579028775 +0800
+@@ -20,6 +20,10 @@
+ EXTRA_CFLAGS += -Wno-vla -g
+ 
+ EXTRA_CFLAGS += -I$(src)/include -I$(srctree)/$(src)/include
++# LineageOS 4.9.337 backports the modern cfg80211 ABI (cfg80211_roamed()
++# takes struct cfg80211_roam_info, cfg80211_connect_bss() takes the
++# timeout argument), so force the new-ABI code paths.
++EXTRA_CFLAGS += -DCONFIG_RTW_CFG80211_NEW_ABI -DCONFIG_CFG80211_CONNECT_BSS_ANDROID
+ EXTRA_CFLAGS += -I$(src)/hal/phydm -I$(srctree)/$(src)/hal/phydm
+ EXTRA_LDFLAGS += --strip-debug -O3
+ 
+--- a/drivers/net/wireless/realtek/rtl8812au/os_dep/linux/ioctl_cfg80211.c	2026-09-13 08:49:51.361262389 +0800
++++ b/drivers/net/wireless/realtek/rtl8812au/os_dep/linux/ioctl_cfg80211.c	2026-09-13 08:48:29.578302354 +0800
+@@ -1083,7 +1083,7 @@
+ #ifdef CONFIG_P2P
+ 	struct wifidirect_info *pwdinfo = &(padapter->wdinfo);
+ #endif
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0) || defined(CONFIG_RTW_CFG80211_NEW_ABI))
+ 	struct cfg80211_roam_info roam_info ={};
+ #endif
+ 
+@@ -1156,7 +1156,7 @@
+ 		notify_channel = ieee80211_get_channel(wiphy, freq);
+ 		#endif
+ 
+-		#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
++		#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0) || defined(CONFIG_RTW_CFG80211_NEW_ABI))
+ 		#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 0, 0) 
+ 		#if RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(9, 0)
+ 		#else
+diff --git a/drivers/net/wireless/realtek/Kconfig b/drivers/net/wireless/realtek/Kconfig
+index 8a8ba2003964..3fe3462939af 100644
+--- a/drivers/net/wireless/realtek/Kconfig
++++ b/drivers/net/wireless/realtek/Kconfig
+@@ -14,5 +14,6 @@ if WLAN_VENDOR_REALTEK
+ source "drivers/net/wireless/realtek/rtl818x/Kconfig"
+ source "drivers/net/wireless/realtek/rtlwifi/Kconfig"
+ source "drivers/net/wireless/realtek/rtl8xxxu/Kconfig"
++source "drivers/net/wireless/realtek/rtl8812au/Kconfig"
+ 
+ endif # WLAN_VENDOR_REALTEK
+diff --git a/drivers/net/wireless/realtek/Makefile b/drivers/net/wireless/realtek/Makefile
+index 9c78deb5eea9..4df9a7ca75d1 100644
+--- a/drivers/net/wireless/realtek/Makefile
++++ b/drivers/net/wireless/realtek/Makefile
+@@ -7,3 +7,4 @@ obj-$(CONFIG_RTL8187)		+= rtl818x/
+ obj-$(CONFIG_RTLWIFI)		+= rtlwifi/
+ obj-$(CONFIG_RTL8XXXU)		+= rtl8xxxu/
+ 
++obj-$(CONFIG_88XXAU)		+= rtl8812au/

@@ -23,6 +23,11 @@ on:
         required: false
         default: master
         type: string
+      rtl8812au_ref:
+        description: rtl8812au driver branch, tag, or commit
+        required: false
+        default: v5.6.4.2
+        type: string
       force_rebuild:
         description: Ignore the unchanged-input cache and rebuild
         required: false
@@ -59,12 +64,14 @@ jobs:
       cake_sha: ${{ steps.meta.outputs.cake_sha }}
       bbg_sha: ${{ steps.meta.outputs.bbg_sha }}
       kernel_patches_sha: ${{ steps.meta.outputs.kernel_patches_sha }}
+      rtl8812au_sha: ${{ steps.meta.outputs.rtl8812au_sha }}
       anykernel_sha: ${{ steps.meta.outputs.anykernel_sha }}
     env:
       CONFIG: configs/enchilada.json
       RESUKISU_REF: ${{ inputs.resukisu_ref || 'main' }}
       BBG_REF: ${{ inputs.bbg_ref || 'main' }}
       KERNEL_PATCHES_REF: ${{ inputs.kernel_patches_ref || 'main' }}
+      RTL8812AU_REF: ${{ inputs.rtl8812au_ref || 'v5.6.4.2' }}
       ANYKERNEL_REF: ${{ inputs.anykernel_ref || 'master' }}
     steps:
       - name: Checkout builder metadata
@@ -98,16 +105,18 @@ jobs:
           cake_sha=$(resolve_ref "$(jq -r .cake_repo "$CONFIG")" "$(jq -r .cake_ref "$CONFIG")")
           bbg_sha=$(resolve_ref "$(jq -r .bbg_repo "$CONFIG")" "$BBG_REF")
           kernel_patches_sha=$(resolve_ref "$(jq -r .kernel_patches_repo "$CONFIG")" "$KERNEL_PATCHES_REF")
+          rtl8812au_sha=$(resolve_ref "$(jq -r .rtl8812au_repo "$CONFIG")" "$RTL8812AU_REF")
           anykernel_sha=$(resolve_ref "$(jq -r .anykernel_repo "$CONFIG")" "$ANYKERNEL_REF")
           builder_sha=$(git rev-parse HEAD)
           patch_sha=$(sha256sum patches/lineage-4.9/*.patch | sha256sum | cut -d' ' -f1)
-          build_key="${kernel_base}-${resukisu_sha}-${cake_sha}-${bbg_sha}-${kernel_patches_sha}-${anykernel_sha}-${builder_sha}-${patch_sha}"
+          build_key="${kernel_base}-${resukisu_sha}-${cake_sha}-${bbg_sha}-${kernel_patches_sha}-${rtl8812au_sha}-${anykernel_sha}-${builder_sha}-${patch_sha}"
 
           {
             echo "resukisu_sha=$resukisu_sha"
             echo "cake_sha=$cake_sha"
             echo "bbg_sha=$bbg_sha"
             echo "kernel_patches_sha=$kernel_patches_sha"
+            echo "rtl8812au_sha=$rtl8812au_sha"
             echo "anykernel_sha=$anykernel_sha"
             echo "build_key=$build_key"
           } >> "$GITHUB_OUTPUT"
@@ -146,6 +155,7 @@ jobs:
       CAKE_REF: ${{ needs.resolve-inputs.outputs.cake_sha }}
       BBG_REF: ${{ needs.resolve-inputs.outputs.bbg_sha }}
       KERNEL_PATCHES_REF: ${{ needs.resolve-inputs.outputs.kernel_patches_sha }}
+      RTL8812AU_REF: ${{ needs.resolve-inputs.outputs.rtl8812au_sha }}
       ANYKERNEL_REF: ${{ needs.resolve-inputs.outputs.anykernel_sha }}
       CCACHE_DIR: ${{ github.workspace }}/.ccache
     steps:
@@ -160,7 +170,7 @@ jobs:
           jq -e . "$CONFIG" >/dev/null
           for key in kernel_repo kernel_ref kernel_base defconfig arch cross_compile \
                      resukisu_repo cake_repo bbg_repo \
-                     kernel_patches_repo anykernel_repo; do
+                     kernel_patches_repo rtl8812au_repo anykernel_repo; do
             echo "$key=$(jq -r .$key "$CONFIG")" >> "$GITHUB_OUTPUT"
           done
 
@@ -212,7 +222,9 @@ jobs:
             '${{ steps.config.outputs.cake_repo }}' "$CAKE_REF" "$RUNNER_TEMP/sch_cake" \
             '${{ steps.config.outputs.bbg_repo }}' "$BBG_REF" \
             '${{ steps.config.outputs.kernel_patches_repo }}' "$KERNEL_PATCHES_REF" \
-            "$RUNNER_TEMP/kernel_patches"
+            "$RUNNER_TEMP/kernel_patches" \
+            '${{ steps.config.outputs.rtl8812au_repo }}' "$RTL8812AU_REF" \
+            "$RUNNER_TEMP/rtl8812au"
 
       - name: Fetch latest AnyKernel3
         run: |
@@ -241,6 +253,8 @@ jobs:
           # ReKernel-X
           grep -qx 'CONFIG_REKERNEL=y' out/.config
           grep -qx '# CONFIG_REKERNEL_NETWORK is not set' out/.config
+          # rtl8812au/8821au/8814au out-of-tree USB Wi-Fi
+          grep -qx 'CONFIG_88XXAU=y' out/.config
           required=(
             CONFIG_SYSVIPC CONFIG_POSIX_MQUEUE CONFIG_NAMESPACES CONFIG_UTS_NS
             CONFIG_IPC_NS CONFIG_PID_NS CONFIG_USER_NS CONFIG_NET_NS
@@ -296,11 +310,12 @@ jobs:
           {
             echo "kernel=$(git -C kernel rev-parse HEAD)"
             echo "resukisu=$(git -C kernel/KernelSU rev-parse HEAD)"
-            echo "susfs=v2.2.0-vendored ($(sha256sum patches/lineage-4.9/susfs-4.9.patch | cut -c1-12))"
+            echo "susfs=v2.3.0-vendored ($(sha256sum patches/lineage-4.9/susfs-4.9.patch | cut -c1-12))"
             echo "nomount=vendored ($(sha256sum patches/lineage-4.9/nomount-4.9.patch | cut -c1-12))"
             echo "cake=$(git -C "$RUNNER_TEMP/sch_cake" rev-parse HEAD)"
             echo "baseband_guard=$(git -C kernel/Baseband-guard rev-parse HEAD)"
             echo "kernel_patches=$(git -C "$RUNNER_TEMP/kernel_patches" rev-parse HEAD)"
+            echo "rtl8812au=$(git -C "$RUNNER_TEMP/rtl8812au" rev-parse HEAD)"
             echo "anykernel3=$(git -C anykernel3 rev-parse HEAD)"
           } > artifacts/build-info.txt
 

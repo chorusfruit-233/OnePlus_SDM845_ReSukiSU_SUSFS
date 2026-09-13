@@ -69,9 +69,16 @@ ramdisk、内核模块或 vendor 接口差异而不兼容。不要在未备份�
 
 ### USB Wi-Fi（Kali/渗透测试）
 
-- 启用 Linux 4.9 树内已有的 USB Wi-Fi 驱动（不移植任何第三方驱动）：
+- 启用 Linux 4.9 树内已有的 USB Wi-Fi 驱动：
   `ath9k_htc`（AR9271）、`rt2800usb`（RT3070/5370/5572，含 5GHz）、
   `mt7601u`、`carl9170`、`ar5523`、`rt2500usb`、`rt73usb`、`rtl8xxxu`；
+- 额外集成树外驱动 [aircrack-ng/rtl8812au](https://github.com/aircrack-ng/rtl8812au)
+  （固定 `v5.6.4.2`），支持 **RTL8812AU / RTL8821AU / RTL8814AU** USB 网卡
+  （monitor 模式与注入，Kali/aircrack-ng 常用芯片）。构建时克隆到
+  `drivers/net/wireless/realtek/rtl8812au/`，由
+  `patches/lineage-4.9/rtl8812au-4.9-adaptation.patch` 适配本树回移的
+  cfg80211 ABI（新 `cfg80211_roamed`/`cfg80211_connect_bss` 签名）并以
+  `CONFIG_88XXAU=y` 内建进 `Image.gz-dtb`（无需打包 `.ko`，镜像约 +0.9MB）；
 - 固件通过 `CONFIG_EXTRA_FIRMWARE` 内嵌进内核镜像（`htc_9271.fw`、
   `rt2870.bin`、`mt7601u.bin`，构建时从 linux-firmware 拉取），不依赖
   `/vendor` 固件目录；
@@ -193,6 +200,7 @@ SUSFS 补丁的哈希）和所有上游 commit 共同组成 build key：
 | ReSukiSU | [ReSukiSU/ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) | 默认跟踪 `main` |
 | SUSFS v2.3.0 | 自包含补丁（源自 [JackA1ltman/NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd)） | vendored，随仓库版本变化 |
 | NoMount | [maxsteeel/nomount](https://github.com/maxsteeel/nomount)（dev 分支） | vendored，固定 `0288c11263e6` |
+| RTL8812AU/8821AU/8814AU | [aircrack-ng/rtl8812au](https://github.com/aircrack-ng/rtl8812au) | 默认跟踪 `v5.6.4.2`（构建时克隆 + 适配补丁） |
 | CAKE | [dtaht/sch_cake](https://github.com/dtaht/sch_cake) | 固定最后一版兼容旧 qdisc API 的基线 |
 | BBRv3 patches | [WildKernels/kernel_patches](https://github.com/WildKernels/kernel_patches) | 稀疏拉取 `common/bbrv3` |
 | Baseband Guard | [vc-teahouse/Baseband-guard](https://github.com/vc-teahouse/Baseband-guard) | 默认跟踪 `main` |
@@ -237,8 +245,9 @@ SUS_MOUNT 的 `/proc/self/mountinfo` 和 fdinfo。完整参数见
   并同步更新 `scripts/susfs-inline-hook.sh` 的版本说明；
 - `nomount-4.9.patch` 内嵌 NoMount `dev` 分支快照；NoMount 用户态组件（模块
   ZIP 与 `nomount` 工具）不属于本仓库构建产物，需要从上游 release 单独获取；
-- USB Wi-Fi 仅覆盖 Linux 4.9 树内驱动（AR9271/RT3070/5370/5572/MT7601U 等）；
-  RTL8812AU、RTL8188EUS、MT76 等需要第三方驱动或较新内核的网卡不在支持范围；
+- USB Wi-Fi 覆盖 4.9 树内驱动（AR9271/RT3070/5370/5572/MT7601U 等）与树外的
+  rtl8812au/8821au/8814au；RTL8188EUS、MT76x2U、MT7921U、RTW88/RTW89 等仍需
+  各自第三方驱动或较新内核，不在支持范围；
 - `ath9k-htc-symbols.patch` 只改动了 ath9k 私有 HTC 协议符号名，不影响
   `qcacld-3.0`；若上游 ath9k 代码大幅重构，需要重新生成该补丁。
 

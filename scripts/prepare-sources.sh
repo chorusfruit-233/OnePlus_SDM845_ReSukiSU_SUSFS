@@ -13,6 +13,9 @@ bbg_ref=${9:?Baseband Guard ref is required}
 patches_repo=${10:?kernel patches repository is required}
 patches_ref=${11:?kernel patches ref is required}
 patches_checkout=${12:?kernel patches checkout directory is required}
+rtl8812au_repo=${13:?rtl8812au repository is required}
+rtl8812au_ref=${14:?rtl8812au ref is required}
+rtl8812au_checkout=${15:?rtl8812au checkout directory is required}
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
@@ -37,7 +40,7 @@ clone_sparse_ref() {
 clone_ref "$resukisu_repo" "$resukisu_ref" "$kernel_root/KernelSU"
 ln -sfn ../KernelSU/kernel "$kernel_root/drivers/kernelsu"
 
-# SUSFS v2.2.0 is vendored as a self-contained 4.9 patch (based on
+# SUSFS v2.3.0 is vendored as a self-contained 4.9 patch (based on
 # JackA1ltman/NonGKI_Kernel_Build_2nd), so no upstream git fetch is needed.
 git -C "$kernel_root" apply --whitespace=nowarn \
     "$patch_root/susfs-4.9.patch"
@@ -81,6 +84,18 @@ git -C "$kernel_root" apply --whitespace=nowarn \
 git -C "$kernel_root" apply --whitespace=nowarn \
     "$patch_root/bbrv3-4.9-adaptation.patch"
 
+# Out-of-tree USB Wi-Fi: rtl8812au/8821au/8814au (aircrack-ng). Built into
+# the kernel image via CONFIG_88XXAU, adapted to this tree's backported
+# cfg80211 ABI by rtl8812au-4.9-adaptation.patch.
+clone_ref "$rtl8812au_repo" "$rtl8812au_ref" "$rtl8812au_checkout"
+rm -rf "$kernel_root/drivers/net/wireless/realtek/rtl8812au"
+mkdir -p "$kernel_root/drivers/net/wireless/realtek/rtl8812au"
+tar -C "$rtl8812au_checkout" \
+    --exclude=.git --exclude=docs --exclude='*.pdf' \
+    -cf - . | tar -C "$kernel_root/drivers/net/wireless/realtek/rtl8812au" -xf -
+git -C "$kernel_root" apply --whitespace=nowarn \
+    "$patch_root/rtl8812au-4.9-adaptation.patch"
+
 # USB Wi-Fi firmware embedded via CONFIG_EXTRA_FIRMWARE (ath9k_htc,
 # rt2800usb and mt7601u). Sourced from the official linux-firmware tree.
 fetch_firmware() {
@@ -121,10 +136,15 @@ grep -q 'ksu_handle_stat' "$kernel_root/fs/stat.c"
 grep -q 'ksu_handle_sys_reboot' "$kernel_root/kernel/reboot.c"
 grep -q '^int filename_lookup(' "$kernel_root/fs/namei.c"
 grep -q 'atomic_t filter_count' "$kernel_root/include/linux/seccomp.h"
+test -f "$kernel_root/drivers/net/wireless/realtek/rtl8812au/os_dep/linux/ioctl_cfg80211.c"
+grep -q 'CONFIG_RTW_CFG80211_NEW_ABI' \
+    "$kernel_root/drivers/net/wireless/realtek/rtl8812au/Makefile"
+grep -q 'rtl8812au' "$kernel_root/drivers/net/wireless/realtek/Makefile"
 
 echo "ReSukiSU commit: $(git -C "$kernel_root/KernelSU" rev-parse HEAD)"
 echo "SUSFS patch: $patch_root/susfs-4.9.patch ($(sha256sum "$patch_root/susfs-4.9.patch" | cut -c1-12))"
 echo "NoMount patch: $patch_root/nomount-4.9.patch ($(sha256sum "$patch_root/nomount-4.9.patch" | cut -c1-12))"
+echo "rtl8812au commit: $(git -C "$rtl8812au_checkout" rev-parse HEAD)"
 echo "CAKE commit: $(git -C "$cake_checkout" rev-parse HEAD)"
 echo "Baseband Guard commit: $(git -C "$kernel_root/Baseband-guard" rev-parse HEAD)"
 echo "Kernel patches commit: $(git -C "$patches_checkout" rev-parse HEAD)"
